@@ -1,69 +1,57 @@
 openapi: 3.0.3
 info:
   title: FIMAP API
-  description: >
-    API do FIMAP — plataforma de gestão e organização financeira pessoal.
-    Arquitetura vigente: o FIMAP persiste apenas dados próprios do
-    aplicativo (identidade, sessões, preferências, metadados de conexão
-    Open Finance, metas, notificações e comunidade). Dados financeiros
-    (saldos, transações, investimentos, ativos, posições, contas
-    bancárias externas, cartões e faturas) são consultados sob demanda
-    no provedor de Open Finance pelo Back-end, normalizados e devolvidos
-    ao Front-end — NÃO existe espelhamento/persistência local desses
-    dados. Endpoints do grupo "Dados Financeiros" são somente leitura e não
-    representam tabelas locais.
-  version: "2.0.0"
+  description: 'API do FIMAP — plataforma de gestão e organização financeira pessoal. Alinhada ao Modelo Lógico
+    (tabelas tbl_*): o FIMAP persiste apenas dados próprios do aplicativo (usuário, dispositivos, OTP, configurações,
+    metadados de conexão Open Finance, metas, simulações, notificações, comunidade, gamificação, chat e recomendações
+    de IA). Dados financeiros (saldos, transações, investimentos, ativos, contas, cartões e faturas) são consultados
+    sob demanda no provedor de Open Finance, normalizados e devolvidos — NÃO existe espelhamento local. Os endpoints
+    do grupo "Dados Financeiros" são somente leitura. Convenções: IDs são inteiros (INT); colunas id_* do banco
+    aparecem como *_id; campos TINYINT de status/visibilidade são expostos como enums de texto.'
+  version: 3.0.0
   contact:
     name: Equipe FIMAP
-
 servers:
-  - url: https://api.fimap.app/api/v1
-    description: Produção (exemplo)
-  - url: https://staging-api.fimap.app/api/v1
-    description: Homologação (exemplo)
-
+- url: https://api.fimap.app/api/v1
+  description: Produção (exemplo)
+- url: https://staging-api.fimap.app/api/v1
+  description: Homologação (exemplo)
 tags:
-  - name: Autenticação
-    description: Cadastro, login, renovação de token, logout e recuperação de senha
-  - name: Segundo Fator
-    description: Configuração e verificação do segundo fator de autenticação (2FA)
-  - name: Perfil
-    description: Perfil do usuário autenticado
-  - name: Preferências
-    description: Preferências pessoais do produto (preferencias_usuario)
-  - name: Open Finance
-    description: Conexão e consentimento com o provedor de Open Finance (conexoes_open_finance)
-  - name: Dados Financeiros
-    description: >
-      Consulta de dados financeiros ao provedor de Open Finance. Somente
-      leitura — sem persistência local dos dados retornados.
-  - name: Metas
-    description: Metas financeiras do usuário (metas_financeiras)
-  - name: Notificações
-    description: Notificações do aplicativo (notificacoes)
-  - name: Comunidade
-    description: Publicações, comentários e curtidas (publicacoes/comentarios/curtidas)
-  - name: Conquistas
-    description: >
-      Gamificação — OPCIONAL, somente se badges estiverem no escopo
-      final do projeto (badges/usuario_badges)
-  - name: IA
-    description: >
-      Recomendações do assistente de IA, com histórico persistido
-      (recomendacoes_ia) — mantido por decisão explícita do time, mesmo
-      não sendo exigido pela regra geral de "sem espelho financeiro".
-
+- name: Autenticação
+  description: Cadastro, login, tokens, dispositivos (tbl_dispositivo) e recuperação de senha (tbl_codigo_otp)
+- name: Perfil
+  description: Perfil privado e perfil social (tbl_usuario)
+- name: Seguidores
+  description: Relações de seguir (tbl_seguidores)
+- name: Configurações
+  description: Preferências de notificação e conteúdo (tbl_configuracoes)
+- name: Open Finance
+  description: Metadados de conexão/consentimento (tbl_conexao_open_finance)
+- name: Dados Financeiros
+  description: Consulta ao provedor de Open Finance. Somente leitura, sem persistência local.
+- name: Metas
+  description: Metas financeiras (tbl_meta_financeira, tbl_categoria_meta)
+- name: Simulações
+  description: Simulações de investimento e de amortização
+- name: Notificações
+  description: Notificações do aplicativo (tbl_notificacao)
+- name: Comunidade
+  description: Posts, comentários, curtidas e denúncias
+- name: Gamificação
+  description: Badges, XP e ranking
+- name: IA
+  description: Chat com o assistente financeiro e recomendações geradas (tbl_chat, tbl_mensagem, tbl_recomendacao_ia).
+    A IA é apenas informativa e não executa operações financeiras.
 security:
-  - autenticacaoBearer: []
-
+- autenticacaoBearer: []
 paths:
-  # ============================================================
-  # AUTENTICAÇÃO
-  # ============================================================
   /autenticacao/cadastro:
     post:
-      tags: [Autenticação]
+      operationId: cadastrarUsuario
+      tags:
+      - Autenticação
       summary: Cadastrar novo usuário
+      description: Cria o registro em tbl_usuario. A senha é armazenada somente como hash.
       security: []
       requestBody:
         required: true
@@ -79,7 +67,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Usuario'
         '409':
-          description: E-mail já cadastrado
+          description: E-mail, CPF ou username já cadastrado
           content:
             application/json:
               schema:
@@ -90,12 +78,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /autenticacao/entrar:
     post:
-      tags: [Autenticação]
+      operationId: entrar
+      tags:
+      - Autenticação
       summary: Autenticar usuário (access + refresh token)
-      description: Retorna par de tokens, ou sinaliza exigência de 2FA quando habilitado.
+      description: Quando `dispositivo` é informado, o dispositivo é registrado (ou atualizado) em tbl_dispositivo.
       security: []
       requestBody:
         required: true
@@ -105,7 +94,7 @@ paths:
               $ref: '#/components/schemas/RequisicaoLogin'
       responses:
         '200':
-          description: Login efetuado ou 2FA requerido
+          description: Login efetuado
           content:
             application/json:
               schema:
@@ -116,10 +105,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /autenticacao/renovar-token:
     post:
-      tags: [Autenticação]
+      operationId: renovarToken
+      tags:
+      - Autenticação
       summary: Renovar access token a partir do refresh token
       security: []
       requestBody:
@@ -128,7 +118,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token_renovacao]
+              required:
+              - token_renovacao
               properties:
                 token_renovacao:
                   type: string
@@ -145,42 +136,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /autenticacao/sair:
     post:
-      tags: [Autenticação]
+      operationId: sair
+      tags:
+      - Autenticação
       summary: Encerrar a sessão atual (revoga o refresh token corrente)
       responses:
         '204':
           description: Sessão encerrada
-
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
   /autenticacao/sair-de-todos:
     post:
-      tags: [Autenticação]
-      summary: Encerrar todas as sessões/dispositivos do usuário
+      operationId: sairDeTodos
+      tags:
+      - Autenticação
+      summary: Encerrar todas as sessões do usuário
       responses:
         '204':
           description: Todas as sessões revogadas
-
-  /autenticacao/sessoes/{sessaoId}:
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /autenticacao/dispositivos:
+    get:
+      operationId: listarDispositivos
+      tags:
+      - Autenticação
+      summary: Listar dispositivos cadastrados do usuário (tbl_dispositivo)
+      responses:
+        '200':
+          description: Lista de dispositivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dispositivo'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /autenticacao/dispositivos/{dispositivoId}:
     parameters:
-      - $ref: '#/components/parameters/SessaoId'
+    - $ref: '#/components/parameters/DispositivoId'
     delete:
-      tags: [Autenticação]
-      summary: Revogar uma sessão/dispositivo específico
+      operationId: removerDispositivo
+      tags:
+      - Autenticação
+      summary: Remover um dispositivo (revoga as sessões dele)
       responses:
         '204':
-          description: Sessão revogada
+          description: Dispositivo removido
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '404':
-          description: Sessão não encontrada
+          description: Dispositivo não encontrado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /autenticacao/senha/alterar:
     post:
-      tags: [Autenticação]
+      operationId: alterarSenha
+      tags:
+      - Autenticação
       summary: Alterar senha do usuário autenticado
       requestBody:
         required: true
@@ -188,7 +206,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [senha_atual, nova_senha]
+              required:
+              - senha_atual
+              - nova_senha
               properties:
                 senha_atual:
                   type: string
@@ -200,17 +220,21 @@ paths:
         '200':
           description: Senha alterada com sucesso
         '400':
-          description: Nova senha não atende à política de segurança
+          description: Senha atual incorreta ou nova senha fora da política
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
   /autenticacao/senha/recuperacao/solicitar:
     post:
-      tags: [Autenticação]
-      summary: Solicitar recuperação de senha (gera token/OTP)
-      description: Cria um registro em tokens_recuperacao e dispara um código via codigos_otp.
+      operationId: solicitarRecuperacaoSenha
+      tags:
+      - Autenticação
+      summary: Solicitar recuperação de senha (gera código OTP)
+      description: Gera um registro em tbl_codigo_otp (código de 6 dígitos, `ativo`, `data_expiracao`) e envia ao
+        e-mail do usuário. Responde 202 mesmo se o e-mail não existir.
       security: []
       requestBody:
         required: true
@@ -218,20 +242,24 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email]
+              required:
+              - email
               properties:
                 email:
                   type: string
+                  maxLength: 255
                   format: email
       responses:
         '202':
           description: Processo de recuperação iniciado
-
   /autenticacao/senha/recuperacao/validar-codigo:
     post:
-      tags: [Autenticação]
+      operationId: validarCodigoRecuperacao
+      tags:
+      - Autenticação
       summary: Validar código OTP de recuperação
-      description: Controle de tentativas e expiração residem em codigos_otp.
+      description: Valida contra tbl_codigo_otp (`codigo`, `ativo`, `data_expiracao`) e o inativa. O `token_redefinicao`
+        é um token assinado de curta duração (não há tabela própria no modelo).
       security: []
       requestBody:
         required: true
@@ -239,16 +267,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, codigo]
+              required:
+              - email
+              - codigo
               properties:
                 email:
                   type: string
+                  maxLength: 255
                   format: email
                 codigo:
                   type: string
+                  maxLength: 6
+                  minLength: 6
       responses:
         '200':
-          description: Código válido — devolve token de confirmação para a próxima etapa
+          description: Código válido — devolve token de redefinição
           content:
             application/json:
               schema:
@@ -257,15 +290,16 @@ paths:
                   token_redefinicao:
                     type: string
         '400':
-          description: Código expirado, incorreto ou número de tentativas excedido
+          description: Código expirado, incorreto ou já utilizado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /autenticacao/senha/recuperacao/redefinir:
     post:
-      tags: [Autenticação]
+      operationId: redefinirSenha
+      tags:
+      - Autenticação
       summary: Definir nova senha ao final do fluxo de recuperação
       security: []
       requestBody:
@@ -274,7 +308,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token_redefinicao, nova_senha]
+              required:
+              - token_redefinicao
+              - nova_senha
               properties:
                 token_redefinicao:
                   type: string
@@ -290,55 +326,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
-  # ============================================================
-  # SEGUNDO FATOR (2FA)
-  # ============================================================
-  /autenticacao/segundo-fator/configurar:
-    post:
-      tags: [Segundo Fator]
-      summary: Iniciar configuração do segundo fator (autenticacao_2fa)
-      description: >
-        Gera segredo de enrolamento (exibido uma única vez) e QR code.
-        O segredo cifrado nunca é retornado em consultas posteriores.
-      responses:
-        '200':
-          description: Dados de provisionamento do autenticador
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RespostaConfiguracaoSegundoFator'
-
-  /autenticacao/segundo-fator/verificar:
-    post:
-      tags: [Segundo Fator]
-      summary: Verificar código e ativar o segundo fator
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [codigo]
-              properties:
-                codigo:
-                  type: string
-      responses:
-        '200':
-          description: Segundo fator ativado com sucesso
-        '400':
-          description: Código inválido
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
-
-  # ============================================================
-  # PERFIL DO USUÁRIO
-  # ============================================================
   /usuarios/eu:
     get:
-      tags: [Perfil]
+      operationId: consultarPerfil
+      tags:
+      - Perfil
       summary: Consultar perfil do usuário autenticado
       responses:
         '200':
@@ -347,8 +339,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
     patch:
-      tags: [Perfil]
+      operationId: editarPerfil
+      tags:
+      - Perfil
       summary: Editar dados do perfil
       requestBody:
         required: true
@@ -363,45 +359,195 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Usuario'
-
-  # ============================================================
-  # PREFERÊNCIAS
-  # ============================================================
-  /preferencias:
-    get:
-      tags: [Preferências]
-      summary: Consultar preferências do usuário (preferencias_usuario)
-      responses:
-        '200':
-          description: Preferências atuais
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '409':
+          description: Username ou username social já em uso
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PreferenciasUsuario'
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /usuarios/{usuarioId}:
+    parameters:
+    - $ref: '#/components/parameters/UsuarioId'
+    get:
+      operationId: consultarPerfilPublico
+      tags:
+      - Perfil
+      summary: Consultar perfil social de outro usuário
+      description: Retorna somente campos sociais. Se o usuário tiver `visibilidade` = privado, o Back-end limita
+        os campos retornados.
+      responses:
+        '200':
+          description: Perfil social
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerfilPublico'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /usuarios/{usuarioId}/seguir:
+    parameters:
+    - $ref: '#/components/parameters/UsuarioId'
+    post:
+      operationId: seguirUsuario
+      tags:
+      - Seguidores
+      summary: Seguir um usuário (tbl_seguidores)
+      responses:
+        '204':
+          description: Agora segue o usuário
+        '400':
+          description: Não é possível seguir a si mesmo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '409':
+          description: Já segue este usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    delete:
+      operationId: deixarDeSeguirUsuario
+      tags:
+      - Seguidores
+      summary: Deixar de seguir um usuário
+      responses:
+        '204':
+          description: Deixou de seguir
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Usuário não encontrado ou não seguido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /usuarios/{usuarioId}/seguidores:
+    parameters:
+    - $ref: '#/components/parameters/UsuarioId'
+    get:
+      operationId: listarSeguidores
+      tags:
+      - Seguidores
+      summary: Listar seguidores de um usuário
+      parameters:
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Lista de seguidores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioResumo'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /usuarios/{usuarioId}/seguindo:
+    parameters:
+    - $ref: '#/components/parameters/UsuarioId'
+    get:
+      operationId: listarSeguindo
+      tags:
+      - Seguidores
+      summary: Listar quem o usuário segue
+      parameters:
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Lista de usuários seguidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioResumo'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /configuracoes:
+    get:
+      operationId: consultarConfiguracoes
+      tags:
+      - Configurações
+      summary: Consultar configurações do usuário (tbl_configuracoes)
+      responses:
+        '200':
+          description: Configurações atuais
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuracoes'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
     put:
-      tags: [Preferências]
-      summary: Atualizar preferências (notificações, privacidade, IA)
+      operationId: atualizarConfiguracoes
+      tags:
+      - Configurações
+      summary: Atualizar configurações (notificações, alertas, relatórios, recomendações, tópicos)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EntradaPreferenciasUsuario'
+              $ref: '#/components/schemas/Configuracoes'
       responses:
         '200':
-          description: Preferências atualizadas
+          description: Configurações atualizadas
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PreferenciasUsuario'
-
-  # ============================================================
-  # OPEN FINANCE (metadados de conexão — sem dados financeiros)
-  # ============================================================
+                $ref: '#/components/schemas/Configuracoes'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /open-finance/conexoes:
     get:
-      tags: [Open Finance]
-      summary: Listar conexões/consentimentos Open Finance do usuário (conexoes_open_finance)
+      operationId: listarConexoesOpenFinance
+      tags:
+      - Open Finance
+      summary: Listar conexões Open Finance do usuário (tbl_conexao_open_finance)
       description: Retorna apenas metadados técnicos da conexão — nunca saldo, transações ou posições.
       responses:
         '200':
@@ -412,8 +558,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ConexaoOpenFinance'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
     post:
-      tags: [Open Finance]
+      operationId: criarConexaoOpenFinance
+      tags:
+      - Open Finance
       summary: Iniciar uma nova conexão/consentimento com uma instituição
       requestBody:
         required: true
@@ -423,18 +573,33 @@ paths:
               $ref: '#/components/schemas/EntradaConexaoOpenFinance'
       responses:
         '201':
-          description: Conexão criada (estado inicial pendente/autorizado, conforme fluxo do provedor)
+          description: Conexão criada em estado pendente
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConexaoOpenFinance'
-
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '502':
+          description: Falha ao iniciar consentimento no provedor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /open-finance/conexoes/{conexaoId}:
     parameters:
-      - $ref: '#/components/parameters/ConexaoId'
+    - $ref: '#/components/parameters/ConexaoId'
     get:
-      tags: [Open Finance]
-      summary: Consultar metadados de uma conexão específica
+      operationId: consultarConexaoOpenFinance
+      tags:
+      - Open Finance
+      summary: Consultar metadados de uma conexão
       responses:
         '200':
           description: Detalhe da conexão
@@ -442,6 +607,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConexaoOpenFinance'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '404':
           description: Conexão não encontrada
           content:
@@ -449,195 +616,293 @@ paths:
               schema:
                 $ref: '#/components/schemas/Erro'
     delete:
-      tags: [Open Finance]
-      summary: Revogar/encerrar uma conexão (revoga o consentimento no provedor)
+      operationId: revogarConexaoOpenFinance
+      tags:
+      - Open Finance
+      summary: Revogar uma conexão (revoga o consentimento no provedor)
       responses:
         '204':
           description: Conexão revogada
-
-  # ============================================================
-  # DADOS FINANCEIROS — SOMENTE CONSULTA, SEM PERSISTÊNCIA LOCAL
-  # ============================================================
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Conexão não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /financeiro/resumo:
     get:
-      tags: [Dados Financeiros]
+      operationId: consultarResumoFinanceiro
+      tags:
+      - Dados Financeiros
       summary: Consultar resumo financeiro consolidado
-      description: >
-        Dado agregado calculado em tempo real a partir do provedor de
-        Open Finance para as conexões ativas do usuário. Não representa
-        tabela local — nada aqui é persistido.
+      description: Agregado calculado em tempo real a partir do provedor. Nada é persistido.
       parameters:
-        - $ref: '#/components/parameters/ConexaoIdQuery'
+      - $ref: '#/components/parameters/ConexaoIdQuery'
       responses:
         '200':
-          description: Resumo financeiro
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResumoFinanceiro'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /financeiro/contas:
     get:
-      tags: [Dados Financeiros]
-      summary: Consultar contas bancárias externas do usuário
-      description: Dado obtido sob demanda no provedor. Sem tabela local de contas.
+      operationId: listarContasFinanceiras
+      tags:
+      - Dados Financeiros
+      summary: Consultar contas bancárias externas
+      description: Obtido sob demanda no provedor. Sem tabela local.
       parameters:
-        - $ref: '#/components/parameters/ConexaoIdQuery'
+      - $ref: '#/components/parameters/ConexaoIdQuery'
       responses:
         '200':
-          description: Lista de contas externas
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/ContaFinanceira'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /financeiro/transacoes:
     get:
-      tags: [Dados Financeiros]
-      summary: Consultar transações do provedor de Open Finance
-      description: >
-        Somente leitura. NÃO existem POST/PUT/DELETE de transações —
-        não há tabela transacoes no FIMAP.
+      operationId: listarTransacoesFinanceiras
+      tags:
+      - Dados Financeiros
+      summary: Consultar transações do provedor
+      description: Somente leitura. Não existem POST/PUT/DELETE — não há tabela de transações no FIMAP.
       parameters:
-        - $ref: '#/components/parameters/ConexaoIdQuery'
-        - name: data_inicio
-          in: query
-          schema: { type: string, format: date }
-        - name: data_fim
-          in: query
-          schema: { type: string, format: date }
-        - $ref: '#/components/parameters/Pagina'
-        - $ref: '#/components/parameters/TamanhoPagina'
+      - $ref: '#/components/parameters/ConexaoIdQuery'
+      - name: data_inicio
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: data_fim
+        in: query
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
-          description: Lista de transações (dado externo)
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/TransacaoFinanceira'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /financeiro/investimentos:
     get:
-      tags: [Dados Financeiros]
-      summary: Consultar investimentos do provedor de Open Finance
-      description: Somente leitura. Sem tabela local de investimentos/posições.
+      operationId: listarInvestimentosFinanceiros
+      tags:
+      - Dados Financeiros
+      summary: Consultar investimentos do provedor
+      description: Somente leitura. Sem tabela local.
       parameters:
-        - $ref: '#/components/parameters/ConexaoIdQuery'
+      - $ref: '#/components/parameters/ConexaoIdQuery'
       responses:
         '200':
-          description: Lista de investimentos (dado externo)
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/InvestimentoFinanceiro'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /financeiro/ativos:
     get:
-      tags: [Dados Financeiros]
-      summary: Consultar catálogo de ativos referenciados nos investimentos externos
-      description: Somente leitura. Sem tabela local de ativos.
+      operationId: listarAtivosFinanceiros
+      tags:
+      - Dados Financeiros
+      summary: Consultar catálogo de ativos dos investimentos externos
+      description: Somente leitura. Sem tabela local.
       responses:
         '200':
-          description: Lista de ativos (dado externo)
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/AtivoFinanceiro'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /financeiro/cartoes:
     get:
-      tags: [Dados Financeiros]
-      summary: Consultar cartões do provedor de Open Finance
+      operationId: listarCartoesFinanceiros
+      tags:
+      - Dados Financeiros
+      summary: Consultar cartões do provedor
       description: Somente leitura. Sem tabela local de cartões.
       parameters:
-        - $ref: '#/components/parameters/ConexaoIdQuery'
+      - $ref: '#/components/parameters/ConexaoIdQuery'
       responses:
         '200':
-          description: Lista de cartões (dado externo)
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/CartaoFinanceiro'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
   /financeiro/faturas:
     get:
-      tags: [Dados Financeiros]
-      summary: Consultar faturas do provedor de Open Finance
-      description: Somente leitura. Sem tabela local de faturas/parcelas.
+      operationId: listarFaturasFinanceiras
+      tags:
+      - Dados Financeiros
+      summary: Consultar faturas do provedor
+      description: Somente leitura. Sem tabela local de faturas.
       parameters:
-        - name: cartao_id_externo
-          in: query
-          description: ID do cartão no provedor externo (não é um ID interno do FIMAP)
-          schema: { type: string }
+      - $ref: '#/components/parameters/ConexaoIdQuery'
+      - name: cartao_id_externo
+        in: query
+        description: ID do cartão no provedor externo (não é ID interno do FIMAP)
+        schema:
+          type: string
       responses:
         '200':
-          description: Lista de faturas (dado externo)
+          description: Dado externo consultado sob demanda
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/FaturaFinanceira'
+        '400':
+          description: Parâmetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '502':
           description: Falha ao consultar o provedor de Open Finance
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
-
-  # ============================================================
-  # METAS (metas_financeiras) — entidade própria, CRUD completo
-  # ============================================================
+  /metas/categorias:
+    get:
+      operationId: listarCategoriasMeta
+      tags:
+      - Metas
+      summary: Listar categorias de meta (tbl_categoria_meta)
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoriaMeta'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
   /metas:
     get:
-      tags: [Metas]
+      operationId: listarMetas
+      tags:
+      - Metas
       summary: Listar metas financeiras do usuário
+      parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/StatusMeta'
+      - name: categoria_id
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
           description: Lista de metas
@@ -647,8 +912,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MetaFinanceira'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
     post:
-      tags: [Metas]
+      operationId: criarMeta
+      tags:
+      - Metas
       summary: Criar nova meta financeira
       requestBody:
         required: true
@@ -663,12 +932,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetaFinanceira'
-
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /metas/{metaId}:
     parameters:
-      - $ref: '#/components/parameters/MetaId'
+    - $ref: '#/components/parameters/MetaId'
     get:
-      tags: [Metas]
+      operationId: consultarMeta
+      tags:
+      - Metas
       summary: Consultar uma meta e seu progresso
       responses:
         '200':
@@ -677,6 +955,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetaFinanceira'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
         '404':
           description: Meta não encontrada
           content:
@@ -684,7 +964,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Erro'
     patch:
-      tags: [Metas]
+      operationId: atualizarMeta
+      tags:
+      - Metas
       summary: Atualizar parcialmente uma meta
       requestBody:
         required: true
@@ -699,26 +981,283 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetaFinanceira'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Meta não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
     delete:
-      tags: [Metas]
+      operationId: removerMeta
+      tags:
+      - Metas
       summary: Remover uma meta
       responses:
         '204':
           description: Meta removida
-
-  # ============================================================
-  # NOTIFICAÇÕES (notificacoes)
-  # ============================================================
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Meta não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /simulacoes/investimentos:
+    get:
+      operationId: listarSimulacoesInvestimento
+      tags:
+      - Simulações
+      summary: Listar simulações de investimento do usuário (tbl_simulacao_investimento)
+      parameters:
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Lista de simulações
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SimulacaoInvestimento'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+    post:
+      operationId: criarSimulacaoInvestimento
+      tags:
+      - Simulações
+      summary: Salvar nova simulação de investimento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntradaSimulacaoInvestimento'
+      responses:
+        '201':
+          description: Simulação criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulacaoInvestimento'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /simulacoes/investimentos/{simulacaoId}:
+    parameters:
+    - $ref: '#/components/parameters/SimulacaoId'
+    get:
+      operationId: consultarSimulacaoInvestimento
+      tags:
+      - Simulações
+      summary: Consultar uma simulação de investimento
+      responses:
+        '200':
+          description: Detalhe da simulação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulacaoInvestimento'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Simulação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    patch:
+      operationId: atualizarSimulacaoInvestimento
+      tags:
+      - Simulações
+      summary: Atualizar parcialmente uma simulação de investimento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtualizacaoSimulacaoInvestimento'
+      responses:
+        '200':
+          description: Simulação atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulacaoInvestimento'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Simulação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    delete:
+      operationId: removerSimulacaoInvestimento
+      tags:
+      - Simulações
+      summary: Remover uma simulação de investimento
+      responses:
+        '204':
+          description: Simulação removida
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Simulação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /simulacoes/amortizacoes:
+    get:
+      operationId: listarSimulacoesAmortizacao
+      tags:
+      - Simulações
+      summary: Listar simulações de amortização do usuário (tbl_simulacao_amortizacao)
+      parameters:
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Lista de simulações
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SimulacaoAmortizacao'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+    post:
+      operationId: criarSimulacaoAmortizacao
+      tags:
+      - Simulações
+      summary: Salvar nova simulação de amortização
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntradaSimulacaoAmortizacao'
+      responses:
+        '201':
+          description: Simulação criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulacaoAmortizacao'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /simulacoes/amortizacoes/{simulacaoId}:
+    parameters:
+    - $ref: '#/components/parameters/SimulacaoId'
+    get:
+      operationId: consultarSimulacaoAmortizacao
+      tags:
+      - Simulações
+      summary: Consultar uma simulação de amortização
+      responses:
+        '200':
+          description: Detalhe da simulação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulacaoAmortizacao'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Simulação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    patch:
+      operationId: atualizarSimulacaoAmortizacao
+      tags:
+      - Simulações
+      summary: Atualizar parcialmente uma simulação de amortização
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtualizacaoSimulacaoAmortizacao'
+      responses:
+        '200':
+          description: Simulação atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulacaoAmortizacao'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Simulação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    delete:
+      operationId: removerSimulacaoAmortizacao
+      tags:
+      - Simulações
+      summary: Remover uma simulação de amortização
+      responses:
+        '204':
+          description: Simulação removida
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Simulação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /notificacoes:
     get:
-      tags: [Notificações]
-      summary: Listar notificações do usuário
+      operationId: listarNotificacoes
+      tags:
+      - Notificações
+      summary: Listar notificações do usuário (tbl_notificacao)
       parameters:
-        - name: lida
-          in: query
-          schema: { type: boolean }
-        - $ref: '#/components/parameters/Pagina'
-        - $ref: '#/components/parameters/TamanhoPagina'
+      - name: lida
+        in: query
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
           description: Lista de notificações
@@ -728,19 +1267,24 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Notificacao'
-
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
   /notificacoes/{notificacaoId}:
     parameters:
-      - $ref: '#/components/parameters/NotificacaoId'
+    - $ref: '#/components/parameters/NotificacaoId'
     patch:
-      tags: [Notificações]
-      summary: Atualizar estado de leitura da notificação
+      operationId: atualizarNotificacao
+      tags:
+      - Notificações
+      summary: Marcar notificação como lida/não lida
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+              - lida
               properties:
                 lida:
                   type: boolean
@@ -751,69 +1295,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Notificacao'
-
-  # ============================================================
-  # COMUNIDADE (publicacoes / comentarios / curtidas)
-  # ============================================================
-  /comunidade/publicacoes:
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Notificação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /comunidade/posts:
     get:
-      tags: [Comunidade]
-      summary: Listar publicações do feed
+      operationId: listarPosts
+      tags:
+      - Comunidade
+      summary: Listar posts do feed
       parameters:
-        - $ref: '#/components/parameters/Pagina'
-        - $ref: '#/components/parameters/TamanhoPagina'
+      - name: usuario_id
+        in: query
+        description: Filtra posts de um autor específico
+        schema:
+          type: integer
+          format: int32
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
-          description: Lista de publicações
+          description: Lista de posts
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Publicacao'
+                  $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
     post:
-      tags: [Comunidade]
-      summary: Criar nova publicação
+      operationId: criarPost
+      tags:
+      - Comunidade
+      summary: Criar novo post
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EntradaPublicacao'
+              $ref: '#/components/schemas/EntradaPost'
       responses:
         '201':
-          description: Publicação criada
+          description: Post criado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Publicacao'
-
-  /comunidade/publicacoes/{publicacaoId}:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /comunidade/posts/{postId}:
     parameters:
-      - $ref: '#/components/parameters/PublicacaoId'
+    - $ref: '#/components/parameters/PostId'
     get:
-      tags: [Comunidade]
-      summary: Consultar uma publicação
+      operationId: consultarPost
+      tags:
+      - Comunidade
+      summary: Consultar um post
       responses:
         '200':
-          description: Detalhe da publicação
+          description: Detalhe do post
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Publicacao'
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Post não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    patch:
+      operationId: editarPost
+      tags:
+      - Comunidade
+      summary: Editar post próprio (atualiza data_atualizacao)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntradaPost'
+      responses:
+        '200':
+          description: Post atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          description: Sem permissão para editar este post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Post não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
     delete:
-      tags: [Comunidade]
-      summary: Remover publicação própria (ou moderada)
+      operationId: removerPost
+      tags:
+      - Comunidade
+      summary: Remover post próprio (ou moderado)
       responses:
         '204':
-          description: Publicação removida
-
-  /comunidade/publicacoes/{publicacaoId}/comentarios:
+          description: Post removido
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          description: Sem permissão para remover este post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Post não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /comunidade/posts/{postId}/comentarios:
     parameters:
-      - $ref: '#/components/parameters/PublicacaoId'
+    - $ref: '#/components/parameters/PostId'
     get:
-      tags: [Comunidade]
-      summary: Listar comentários de uma publicação
+      operationId: listarComentarios
+      tags:
+      - Comunidade
+      summary: Listar comentários de um post
+      description: Retorna comentários e respostas. Respostas trazem `comentario_pai_id` preenchido.
+      parameters:
+      - name: comentario_pai_id
+        in: query
+        description: Quando informado, lista somente as respostas desse comentário. Quando omitido, lista os comentários
+          de primeiro nível.
+        schema:
+          type: integer
+          format: int32
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
           description: Lista de comentários
@@ -823,9 +1466,19 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Comentario'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Post não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
     post:
-      tags: [Comunidade]
-      summary: Comentar em uma publicação
+      operationId: criarComentario
+      tags:
+      - Comunidade
+      summary: Comentar em um post (ou responder a um comentário)
       requestBody:
         required: true
         content:
@@ -839,86 +1492,262 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Comentario'
-
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Post ou comentário pai não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
   /comunidade/comentarios/{comentarioId}:
     parameters:
-      - $ref: '#/components/parameters/ComentarioId'
+    - $ref: '#/components/parameters/ComentarioId'
     delete:
-      tags: [Comunidade]
+      operationId: removerComentario
+      tags:
+      - Comunidade
       summary: Remover comentário próprio (ou moderado)
       responses:
         '204':
           description: Comentário removido
-
-  /comunidade/publicacoes/{publicacaoId}/curtidas:
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          description: Sem permissão para remover este comentário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '404':
+          description: Comentário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /comunidade/posts/{postId}/curtidas:
     parameters:
-      - $ref: '#/components/parameters/PublicacaoId'
+    - $ref: '#/components/parameters/PostId'
     post:
-      tags: [Comunidade]
-      summary: Curtir uma publicação (curtidas)
+      operationId: curtirPost
+      tags:
+      - Comunidade
+      summary: Curtir um post (tbl_curtida_post)
       responses:
         '204':
           description: Curtida registrada
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Post não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
         '409':
-          description: Publicação já curtida pelo usuário
+          description: Post já curtido pelo usuário
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
     delete:
-      tags: [Comunidade]
-      summary: Remover curtida de uma publicação
+      operationId: removerCurtidaPost
+      tags:
+      - Comunidade
+      summary: Remover curtida de um post
       responses:
         '204':
           description: Curtida removida
-
-  # ============================================================
-  # CONQUISTAS / BADGES (opcional — somente se gamificação estiver no escopo)
-  # ============================================================
-  /conquistas:
-    get:
-      tags: [Conquistas]
-      summary: Listar catálogo de conquistas disponíveis (opcional)
-      description: >
-        OPCIONAL — expor apenas se o módulo de gamificação (badges/
-        usuario_badges) estiver confirmado no escopo final do projeto.
-      responses:
-        '200':
-          description: Lista de conquistas
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Post ou curtida não encontrada
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Conquista'
-
-  /usuarios/eu/conquistas:
-    get:
-      tags: [Conquistas]
-      summary: Listar conquistas obtidas pelo usuário (usuario_badges) (opcional)
-      responses:
-        '200':
-          description: Lista de conquistas do usuário
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ConquistaUsuario'
-
-   # ============================================================
-  # IA — chat único por usuário (conversa implícita, sem conversaId)
-  # ============================================================
-  
-  /ia/conversas:
+                $ref: '#/components/schemas/Erro'
+  /comunidade/comentarios/{comentarioId}/curtidas:
+    parameters:
+    - $ref: '#/components/parameters/ComentarioId'
     post:
-      operationId: CriarConversa
-      tags: [IA]
-      summary: Criar nova conversa com o assistente financeiro
-      description: >
-        Cria uma nova conversa para o usuário autenticado. Se `titulo` não for
-        informado, o Back-end gera um título automaticamente a partir da
-        primeira mensagem enviada.
+      operationId: curtirComentario
+      tags:
+      - Comunidade
+      summary: Curtir um comentário (tbl_curtida_comentario)
+      responses:
+        '204':
+          description: Curtida registrada
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Comentário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '409':
+          description: Comentário já curtido pelo usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    delete:
+      operationId: removerCurtidaComentario
+      tags:
+      - Comunidade
+      summary: Remover curtida de um comentário
+      responses:
+        '204':
+          description: Curtida removida
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Comentário ou curtida não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /comunidade/categorias-denuncia:
+    get:
+      operationId: listarCategoriasDenuncia
+      tags:
+      - Comunidade
+      summary: Listar categorias de denúncia (tbl_categoria_denuncia)
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoriaDenuncia'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /comunidade/posts/{postId}/denuncias:
+    parameters:
+    - $ref: '#/components/parameters/PostId'
+    post:
+      operationId: denunciarPost
+      tags:
+      - Comunidade
+      summary: Denunciar um post (tbl_denuncia)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntradaDenuncia'
+      responses:
+        '201':
+          description: Denúncia registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Denuncia'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Post não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /gamificacao/badges:
+    get:
+      operationId: listarBadges
+      tags:
+      - Gamificação
+      summary: Listar catálogo de badges (tbl_badge)
+      responses:
+        '200':
+          description: Lista de badges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Badge'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /usuarios/eu/badges:
+    get:
+      operationId: listarBadgesUsuario
+      tags:
+      - Gamificação
+      summary: Listar badges conquistados pelo usuário (tbl_badge_usuario)
+      responses:
+        '200':
+          description: Lista de badges do usuário
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BadgeUsuario'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /gamificacao/ranking:
+    get:
+      operationId: listarRanking
+      tags:
+      - Gamificação
+      summary: Listar ranking de usuários (tbl_ranking)
+      parameters:
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
+      responses:
+        '200':
+          description: Ranking ordenado por posição
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ranking'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /gamificacao/ranking/eu:
+    get:
+      operationId: consultarRankingUsuario
+      tags:
+      - Gamificação
+      summary: Consultar a posição do usuário autenticado no ranking
+      responses:
+        '200':
+          description: Posição do usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ranking'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Usuário ainda não ranqueado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /ia/chats:
+    post:
+      operationId: criarChat
+      tags:
+      - IA
+      summary: Criar novo chat com o assistente financeiro (tbl_chat)
+      description: Cria o chat e vincula o usuário autenticado em tbl_usuario_chat. Se `nome` não for informado,
+        o Back-end gera um a partir da primeira mensagem.
       requestBody:
         required: false
         content:
@@ -926,22 +1755,17 @@ paths:
             schema:
               type: object
               properties:
-                titulo:
+                nome:
                   type: string
+                  maxLength: 45
                   nullable: true
-                  maxLength: 120
-                  description: Título da conversa (opcional)
-                descricao:
-                  type: string
-                  nullable: true
-                  description: Descrição opcional para contextualizar a conversa
       responses:
         '201':
-          description: Conversa criada com sucesso
+          description: Chat criado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversa'
+                $ref: '#/components/schemas/Chat'
         '400':
           description: Dados inválidos
           content:
@@ -949,96 +1773,135 @@ paths:
               schema:
                 $ref: '#/components/schemas/Erro'
         '401':
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
- 
+          $ref: '#/components/responses/NaoAutenticado'
     get:
-      operationId: ListarConversas
-      tags: [IA]
-      summary: Listar conversas do usuário
-      description: >
-        Lista as conversas do usuário autenticado, ordenadas da mais recente
-        para a mais antiga (por `atualizado_em`). Usado para montar o histórico
-        de conversas na barra lateral.
+      operationId: listarChats
+      tags:
+      - IA
+      summary: Listar chats do usuário
+      description: Chats em que o usuário é participante (tbl_usuario_chat), do mais recente para o mais antigo
+        (última mensagem).
       parameters:
-        - $ref: '#/components/parameters/Pagina'
-        - $ref: '#/components/parameters/TamanhoPagina'
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
-          description: Lista de conversas
+          description: Lista de chats
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Conversa'
+                  $ref: '#/components/schemas/Chat'
         '401':
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
- 
-  /ia/conversas/{conversaId}:
-    delete:
-      operationId: DeletarConversa
-      tags: [IA]
-      summary: Excluir conversa do assistente financeiro
-      description: >
-        Remove a conversa e todas as mensagens associadas do usuário autenticado.
-      parameters:
-        - $ref: '#/components/parameters/ConversaId'
-      responses:
-        '204':
-          description: Conversa excluída com sucesso
-        '401':
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
-        '404':
-          description: Conversa não encontrada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
- 
-  /ia/conversas/{conversaId}/mensagens:
+          $ref: '#/components/responses/NaoAutenticado'
+  /ia/chats/{chatId}:
+    parameters:
+    - $ref: '#/components/parameters/ChatId'
     get:
-      operationId: ListarMensagensConversa
-      tags: [IA]
-      summary: Listar mensagens de uma conversa
-      description: >
-        Retorna as mensagens de uma conversa (para abrir uma conversa antiga),
-        com paginação por cursor. A primeira chamada (sem `antes_de`) retorna
-        as mensagens mais recentes; para carregar as mais antigas, envie o
-        `proximo_cursor` recebido como `antes_de`. Dentro de cada página, as
-        mensagens vêm da mais antiga para a mais recente.
-      parameters:
-        - $ref: '#/components/parameters/ConversaId'
-        - name: antes_de
-          in: query
-          required: false
-          description: Cursor. Retorna apenas mensagens anteriores à mensagem com este id
-          schema:
-            type: string
-            format: uuid
-        - name: limite
-          in: query
-          required: false
-          description: Quantidade máxima de mensagens por página
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 30
+      operationId: consultarChat
+      tags:
+      - IA
+      summary: Consultar os dados de um chat
       responses:
         '200':
-          description: Página de mensagens da conversa
+          description: Detalhe do chat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chat'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Chat não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    patch:
+      operationId: renomearChat
+      tags:
+      - IA
+      summary: Renomear um chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - nome
+              properties:
+                nome:
+                  type: string
+                  maxLength: 45
+      responses:
+        '200':
+          description: Chat atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chat'
+        '400':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Chat não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    delete:
+      operationId: deletarChat
+      tags:
+      - IA
+      summary: Excluir chat e suas mensagens
+      responses:
+        '204':
+          description: Chat excluído
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Chat não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /ia/chats/{chatId}/mensagens:
+    parameters:
+    - $ref: '#/components/parameters/ChatId'
+    get:
+      operationId: listarMensagensChat
+      tags:
+      - IA
+      summary: Listar mensagens de um chat (tbl_mensagem)
+      description: Paginação por cursor. Sem `antes_de`, retorna as mais recentes; para carregar as mais antigas,
+        envie `proximo_cursor` como `antes_de`. Dentro da página, da mais antiga para a mais recente.
+      parameters:
+      - name: antes_de
+        in: query
+        required: false
+        description: Retorna apenas mensagens anteriores à mensagem com este id
+        schema:
+          type: integer
+          format: int32
+      - name: limite
+        in: query
+        required: false
+        description: Quantidade máxima de mensagens por página
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+      responses:
+        '200':
+          description: Página de mensagens
           content:
             application/json:
               schema:
@@ -1050,43 +1913,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/Erro'
         '401':
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
+          $ref: '#/components/responses/NaoAutenticado'
         '404':
-          description: Conversa não encontrada
+          description: Chat não encontrado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
- 
     post:
-      operationId: EnviarMensagemConversa
-      tags: [IA]
-      summary: Enviar mensagem ao assistente dentro de uma conversa
-      description: >
-        Envia uma mensagem na conversa indicada. O contexto é o histórico da
-        própria conversa (o Back-end aplica internamente uma estratégia de
-        janela/resumo). A mensagem do usuário e a resposta do assistente são
-        persistidas. A IA não executa operações financeiras — apoio somente
-        informacional/orientativo.
-      parameters:
-        - $ref: '#/components/parameters/ConversaId'
+      operationId: enviarMensagemChat
+      tags:
+      - IA
+      summary: Enviar mensagem ao assistente
+      description: Persiste a mensagem do usuário e a resposta do assistente em tbl_mensagem. A IA é apenas informativa/orientativa
+        e não executa operações financeiras.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [mensagem]
+              required:
+              - conteudo
               properties:
-                mensagem:
+                conteudo:
                   type: string
-                  minLength: 1
                   maxLength: 4000
-                  description: Texto enviado pelo usuário
+                  minLength: 1
       responses:
         '200':
           description: Mensagem do usuário salva e resposta do assistente gerada
@@ -1101,13 +1954,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Erro'
         '401':
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
+          $ref: '#/components/responses/NaoAutenticado'
         '404':
-          description: Conversa não encontrada
+          description: Chat não encontrado
           content:
             application/json:
               schema:
@@ -1130,15 +1979,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
- 
+  /ia/recomendacoes/categorias:
+    get:
+      operationId: listarCategoriasRecomendacao
+      tags:
+      - IA
+      summary: Listar categorias de recomendação (tbl_categoria_recomendacao)
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoriaRecomendacao'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
   /ia/recomendacoes:
     get:
-      operationId: ListarRecomendacoesIA
-      tags: [IA]
-      summary: Listar histórico de recomendações do usuário (recomendacoes_ia)
+      operationId: listarRecomendacoesIA
+      tags:
+      - IA
+      summary: Listar recomendações geradas para o usuário (tbl_recomendacao_ia)
       parameters:
-        - $ref: '#/components/parameters/Pagina'
-        - $ref: '#/components/parameters/TamanhoPagina'
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/StatusRecomendacao'
+      - name: categoria_id
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - $ref: '#/components/parameters/Pagina'
+      - $ref: '#/components/parameters/TamanhoPagina'
       responses:
         '200':
           description: Lista de recomendações
@@ -1149,63 +2024,47 @@ paths:
                 items:
                   $ref: '#/components/schemas/RecomendacaoIA'
         '401':
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Erro'
-
-                 
-                 
-    # ============================================================
-  # Cartões
-  # ============================================================
-  /cartoes:
-    get:
-      operationId: ListarCartoes
-      tags: [Cartões]
-      summary: Listar cartões do usuário
-      description: Lista os cartões do usuário autenticado.
-      parameters:
-        - $ref: '#/components/parameters/Pagina'
-        - $ref: '#/components/parameters/TamanhoPagina'
-        - name: tipo
-          in: query
-          required: false
-          description: Filtra por tipo de cartão
-          schema:
-            type: string
-            enum: [credito, debito]
-        - name: ativo
-          in: query
-          required: false
-          description: Filtra por cartões ativos ou inativos. Se omitido, retorna todos
-          schema:
-            type: boolean
+          $ref: '#/components/responses/NaoAutenticado'
+  /ia/recomendacoes/{recomendacaoId}:
+    parameters:
+    - $ref: '#/components/parameters/RecomendacaoId'
+    patch:
+      operationId: atualizarStatusRecomendacao
+      tags:
+      - IA
+      summary: Atualizar o status de uma recomendação (aceitar/descartar)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  $ref: '#/components/schemas/StatusRecomendacao'
       responses:
         '200':
-          description: Lista de cartões
+          description: Recomendação atualizada
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Cartao'
+                $ref: '#/components/schemas/RecomendacaoIA'
         '401':
-          description: Não autenticado
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: Recomendação não encontrada
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
- 
-
-
-
-
-
-
-
-
+        '422':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
 components:
   securitySchemes:
     autenticacaoBearer:
@@ -1213,60 +2072,114 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Access token JWT obtido em /autenticacao/entrar ou renovado em /autenticacao/renovar-token
-
+  responses:
+    NaoAutenticado:
+      description: Não autenticado (token ausente, inválido ou expirado)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
   parameters:
     Pagina:
       name: pagina
       in: query
-      schema: { type: integer, minimum: 1, default: 1 }
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
     TamanhoPagina:
       name: tamanho_pagina
       in: query
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-    SessaoId:
-      name: sessaoId
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    DispositivoId:
+      name: dispositivoId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: integer
+        format: int32
+    UsuarioId:
+      name: usuarioId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
     ConexaoId:
       name: conexaoId
       in: path
       required: true
-      description: ID interno do FIMAP para a conexão (não é o ID do provedor externo)
-      schema: { type: string, format: uuid }
+      schema:
+        type: integer
+        format: int32
+      description: ID interno do FIMAP (tbl_conexao_open_finance.id), não o ID do provedor externo
     ConexaoIdQuery:
       name: conexao_id
       in: query
-      description: >
-        Filtra por uma conexão Open Finance específica (ID interno do
-        FIMAP em conexoes_open_finance). Quando omitido, consulta todas
+      description: Filtra por uma conexão Open Finance (tbl_conexao_open_finance.id). Quando omitido, consulta todas
         as conexões ativas do usuário.
-      schema: { type: string, format: uuid }
+      schema:
+        type: integer
+        format: int32
     MetaId:
       name: metaId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: integer
+        format: int32
+    SimulacaoId:
+      name: simulacaoId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
     NotificacaoId:
       name: notificacaoId
       in: path
       required: true
-      schema: { type: string, format: uuid }
-    PublicacaoId:
-      name: publicacaoId
+      schema:
+        type: integer
+        format: int32
+    PostId:
+      name: postId
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema:
+        type: integer
+        format: int32
     ComentarioId:
       name: comentarioId
       in: path
       required: true
-      schema: { type: string, format: uuid }
-
+      schema:
+        type: integer
+        format: int32
+    ChatId:
+      name: chatId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
+    RecomendacaoId:
+      name: recomendacaoId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
   schemas:
     Erro:
       type: object
-      required: [codigo, mensagem]
+      required:
+      - codigo
+      - mensagem
       properties:
         codigo:
           type: string
@@ -1274,7 +2187,7 @@ components:
           type: string
         detalhes:
           type: array
-          description: Detalhes de validação por campo (usado em 400/422)
+          description: Detalhes de validação por campo (400/422)
           items:
             type: object
             properties:
@@ -1282,38 +2195,70 @@ components:
                 type: string
               mensagem:
                 type: string
-
-    # ---------- Autenticação ----------
     RequisicaoCadastro:
       type: object
-      required: [nome, email, senha]
+      required:
+      - nome
+      - cpf
+      - email
+      - username
+      - senha
       properties:
         nome:
           type: string
+          maxLength: 80
+        cpf:
+          type: string
+          maxLength: 20
         email:
           type: string
+          maxLength: 255
           format: email
-        nome_usuario:
+        username:
           type: string
+          maxLength: 80
         senha:
           type: string
+          maxLength: 255
           format: password
-          description: Nunca retornado; armazenado como senha_hash no back-end
-
+          description: Nunca retornada; armazenada como hash em tbl_usuario.senha
+    DispositivoEntrada:
+      type: object
+      required:
+      - nome
+      - sistema_operacional
+      - mac
+      properties:
+        nome:
+          type: string
+          maxLength: 67
+        sistema_operacional:
+          type: string
+          maxLength: 24
+        mac:
+          type: string
+          maxLength: 20
     RequisicaoLogin:
       type: object
-      required: [email, senha]
+      required:
+      - email
+      - senha
       properties:
         email:
           type: string
+          maxLength: 255
           format: email
         senha:
           type: string
           format: password
-
+        dispositivo:
+          $ref: '#/components/schemas/DispositivoEntrada'
     TokensAutenticacao:
       type: object
-      required: [token_acesso, token_renovacao, expira_em]
+      required:
+      - token_acesso
+      - token_renovacao
+      - expira_em
       properties:
         token_acesso:
           type: string
@@ -1322,165 +2267,261 @@ components:
         expira_em:
           type: integer
           description: Validade do token de acesso, em segundos
-
     RespostaLogin:
       type: object
-      required: [requer_segundo_fator]
+      required:
+      - tokens
+      - usuario
       properties:
-        requer_segundo_fator:
-          type: boolean
-          description: Quando true, `tokens` e `usuario` vêm nulos/ausentes.
         tokens:
-          nullable: true
-          allOf:
-            - $ref: '#/components/schemas/TokensAutenticacao'
+          $ref: '#/components/schemas/TokensAutenticacao'
         usuario:
-          nullable: true
-          allOf:
-            - $ref: '#/components/schemas/Usuario'
-
+          $ref: '#/components/schemas/Usuario'
+    Visibilidade:
+      type: string
+      enum:
+      - publico
+      - privado
+      description: Mapeia tbl_usuario.visibilidade (TINYINT). Valores numéricos a confirmar.
     Usuario:
       type: object
-      description: DTO público — nunca inclui senha_hash.
-      required: [id, nome, email, status]
+      description: DTO do próprio usuário (tbl_usuario). Nunca inclui `senha`.
+      required:
+      - id
+      - nome
+      - cpf
+      - email
+      - username
+      - xp_usuario
+      - nivel_total
       properties:
         id:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
         nome:
           type: string
+          maxLength: 80
+        cpf:
+          type: string
+          maxLength: 20
         email:
           type: string
+          maxLength: 255
           format: email
-        nome_usuario:
+        username:
           type: string
-        data_criacao:
+          maxLength: 80
+        xp_usuario:
+          type: integer
+          format: int32
+        nivel_total:
+          type: integer
+          format: int32
+        foto_perfil:
           type: string
-          format: date-time
-        status:
+          maxLength: 255
+          nullable: true
+        nome_exibicao:
           type: string
-          enum: [ativo, inativo, bloqueado]
-
+          maxLength: 80
+          nullable: true
+        username_social:
+          type: string
+          maxLength: 80
+          nullable: true
+        biografia_social:
+          type: string
+          maxLength: 250
+          nullable: true
+        localizacao_estado:
+          type: string
+          maxLength: 100
+          nullable: true
+        visibilidade:
+          $ref: '#/components/schemas/Visibilidade'
     EntradaPerfil:
       type: object
-      minProperties: 1
       properties:
         nome:
           type: string
-        nome_usuario:
+          maxLength: 80
+        username:
           type: string
-
-    Sessao:
+          maxLength: 80
+        foto_perfil:
+          type: string
+          maxLength: 255
+          nullable: true
+        nome_exibicao:
+          type: string
+          maxLength: 80
+          nullable: true
+        username_social:
+          type: string
+          maxLength: 80
+          nullable: true
+        biografia_social:
+          type: string
+          maxLength: 250
+          nullable: true
+        localizacao_estado:
+          type: string
+          maxLength: 100
+          nullable: true
+        visibilidade:
+          $ref: '#/components/schemas/Visibilidade'
+      minProperties: 1
+    UsuarioResumo:
       type: object
-      required: [id, criado_em, expira_em, atual]
+      description: Identificação social mínima (autor de post/comentário, ranking, seguidores).
+      required:
+      - id
       properties:
         id:
+          type: integer
+          format: int32
+        nome_exibicao:
           type: string
-          format: uuid
-        dispositivo:
+          maxLength: 80
+          nullable: true
+        username_social:
           type: string
-        criado_em:
+          maxLength: 80
+          nullable: true
+        foto_perfil:
           type: string
-          format: date-time
-        expira_em:
+          maxLength: 255
+          nullable: true
+    PerfilPublico:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: integer
+          format: int32
+        nome_exibicao:
+          type: string
+          maxLength: 80
+          nullable: true
+        username_social:
+          type: string
+          maxLength: 80
+          nullable: true
+        foto_perfil:
+          type: string
+          maxLength: 255
+          nullable: true
+        biografia_social:
+          type: string
+          maxLength: 250
+          nullable: true
+        localizacao_estado:
+          type: string
+          maxLength: 100
+          nullable: true
+        xp_usuario:
+          type: integer
+          format: int32
+        nivel_total:
+          type: integer
+          format: int32
+        total_seguidores:
+          type: integer
+          format: int32
+        total_seguindo:
+          type: integer
+          format: int32
+        seguido_pelo_usuario:
+          type: boolean
+          description: Se o usuário autenticado já segue este perfil
+    Dispositivo:
+      type: object
+      required:
+      - id
+      - nome
+      - sistema_operacional
+      - data_cadastro
+      properties:
+        id:
+          type: integer
+          format: int32
+        nome:
+          type: string
+          maxLength: 67
+        sistema_operacional:
+          type: string
+          maxLength: 24
+        mac:
+          type: string
+          maxLength: 20
+        data_cadastro:
           type: string
           format: date-time
         atual:
           type: boolean
-          description: Indica se é a sessão da requisição corrente
-
-    RespostaConfiguracaoSegundoFator:
+          description: Indica se é o dispositivo da requisição corrente
+    Configuracoes:
       type: object
-      description: Segredo exibido apenas no momento do provisionamento; não é recuperável depois.
-      required: [segredo, url_otpauth, qr_code_base64]
+      description: Espelha tbl_configuracoes (campos TINYINT tratados como booleanos).
+      required:
+      - notificacao
+      - alerta
+      - relatorio
+      - recomendacao
+      - topicos
       properties:
-        segredo:
-          type: string
-          description: Segredo de enrolamento (exibido uma única vez)
-        url_otpauth:
-          type: string
-        qr_code_base64:
-          type: string
-
-    # ---------- Preferências ----------
-    PreferenciasUsuario:
-      type: object
-      properties:
-        usuario_id:
-          type: string
-          format: uuid
-        notificacoes:
-          type: object
-          additionalProperties: true
-        privacidade:
-          type: object
-          additionalProperties: true
-        preferencias_ia:
-          type: object
-          additionalProperties: true
-
-    EntradaPreferenciasUsuario:
-      type: object
-      properties:
-        notificacoes:
-          type: object
-          additionalProperties: true
-        privacidade:
-          type: object
-          additionalProperties: true
-        preferencias_ia:
-          type: object
-          additionalProperties: true
-
-    # ---------- Open Finance (metadados) ----------
+        notificacao:
+          type: boolean
+        alerta:
+          type: boolean
+        relatorio:
+          type: boolean
+        recomendacao:
+          type: boolean
+        topicos:
+          type: boolean
     ConexaoOpenFinance:
       type: object
-      description: Somente metadados técnicos da conexão/consentimento — nunca saldo ou transações.
-      required: [id, instituicao_id_externo, status]
+      description: Somente metadados técnicos. `consentimento_api` (identificador do consentimento) é segredo do
+        Back-end e não é exposto.
+      required:
+      - id
+      - status
       properties:
         id:
-          type: string
-          format: uuid
-          description: ID interno do FIMAP
-        instituicao_nome:
-          type: string
-        instituicao_id_externo:
-          type: string
-          description: Identificador da instituição no provedor de Open Finance
+          type: integer
+          format: int32
         status:
           type: string
-          enum: [pendente, autorizada, revogada, expirada, erro]
-        escopos:
-          type: array
-          items:
-            type: string
+          enum:
+          - pendente
+          - autorizada
+          - revogada
+          - expirada
+          - erro
+          description: Mapeia tbl_conexao_open_finance.status (TINYINT). Códigos numéricos a confirmar.
+        ultima_sincronizacao:
+          type: string
+          format: date-time
+          nullable: true
         url_autorizacao:
           type: string
           format: uri
           nullable: true
-          description: URL para o usuário concluir o consentimento (presente quando status = pendente)
-        criado_em:
-          type: string
-          format: date-time
-        atualizado_em:
-          type: string
-          format: date-time
-
+          description: 'Transitório: devolvido apenas na criação (status pendente); não persistido.'
     EntradaConexaoOpenFinance:
       type: object
-      required: [instituicao_id_externo]
+      required:
+      - instituicao_id_externo
       properties:
         instituicao_id_externo:
           type: string
-        escopos:
-          type: array
-          items:
-            type: string
-
-    # ---------- Dados Financeiros (DTOs externos, não persistidos) ----------
+          description: Instituição no provedor. Usada para iniciar o consentimento; hoje não existe coluna para
+            persisti-la.
     ResumoFinanceiro:
       type: object
-      description: Agregado calculado em tempo real — não corresponde a tabela local.
+      description: Agregado em tempo real — não corresponde a tabela local.
       properties:
         saldo_total:
           type: number
@@ -1494,17 +2535,15 @@ components:
         atualizado_em:
           type: string
           format: date-time
-
     ContaFinanceira:
       type: object
       description: Dado externo consultado sob demanda — sem tabela local.
       properties:
         id_externo:
           type: string
-          description: ID da conta no provedor de Open Finance
         conexao_id:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
           description: ID interno da conexão FIMAP correspondente
         instituicao_nome:
           type: string
@@ -1515,7 +2554,6 @@ components:
         saldo:
           type: number
           format: double
-
     TransacaoFinanceira:
       type: object
       description: Dado externo consultado sob demanda — sem tabela local.
@@ -1523,14 +2561,16 @@ components:
         id_externo:
           type: string
         conexao_id:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
           description: ID interno da conexão FIMAP correspondente
         conta_id_externo:
           type: string
         tipo:
           type: string
-          enum: [receita, despesa]
+          enum:
+          - receita
+          - despesa
         valor:
           type: number
           format: double
@@ -1541,7 +2581,6 @@ components:
           type: string
         categoria:
           type: string
-
     InvestimentoFinanceiro:
       type: object
       description: Dado externo consultado sob demanda — sem tabela local.
@@ -1549,8 +2588,8 @@ components:
         id_externo:
           type: string
         conexao_id:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
           description: ID interno da conexão FIMAP correspondente
         ativo_codigo:
           type: string
@@ -1560,7 +2599,6 @@ components:
         valor_atual:
           type: number
           format: double
-
     AtivoFinanceiro:
       type: object
       description: Dado externo consultado sob demanda — sem tabela local.
@@ -1573,7 +2611,6 @@ components:
           type: string
         mercado:
           type: string
-
     CartaoFinanceiro:
       type: object
       description: Dado externo consultado sob demanda — sem tabela local.
@@ -1581,8 +2618,8 @@ components:
         id_externo:
           type: string
         conexao_id:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
           description: ID interno da conexão FIMAP correspondente
         nome:
           type: string
@@ -1591,13 +2628,16 @@ components:
         limite:
           type: number
           format: double
-
     FaturaFinanceira:
       type: object
       description: Dado externo consultado sob demanda — sem tabela local.
       properties:
         id_externo:
           type: string
+        conexao_id:
+          type: integer
+          format: int32
+          description: ID interno da conexão FIMAP correspondente
         cartao_id_externo:
           type: string
         periodo:
@@ -1607,324 +2647,716 @@ components:
           format: double
         status:
           type: string
-
-    # ---------- Cartões (GET /cartoes) ----------
-    Cartao:
+    StatusMeta:
+      type: string
+      enum:
+      - em_andamento
+      - concluida
+      - atrasada
+      - cancelada
+      description: Mapeia tbl_meta_financeira.status (TINYINT). Códigos numéricos a confirmar.
+    CategoriaMeta:
       type: object
-      description: Cartão do usuário autenticado, listado em GET /cartoes.
-      required: [id, nome, tipo, ativo]
+      required:
+      - id
+      - nome
       properties:
         id:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
         nome:
           type: string
-        tipo:
-          type: string
-          enum: [credito, debito]
-        bandeira:
-          type: string
-          nullable: true
-        final_cartao:
-          type: string
-          description: Últimos dígitos do cartão
-          example: "1234"
-        limite:
-          type: number
-          format: double
-          nullable: true
-          description: Limite do cartão; nulo para cartões de débito
-        ativo:
-          type: boolean
-        conexao_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: ID interno da conexão FIMAP de origem, quando o cartão vem do Open Finance
-        criado_em:
-          type: string
-          format: date-time
-        atualizado_em:
-          type: string
-          format: date-time
-
-    # ---------- Metas ----------
-    MetaFinanceira:
-      type: object
-      required: [id, nome, valor_alvo, valor_atual, status]
-      properties:
-        id:
-          type: string
-          format: uuid
-        nome:
-          type: string
-        valor_alvo:
-          type: number
-          format: double
-          minimum: 0
-          exclusiveMinimum: true
-        valor_atual:
-          type: number
-          format: double
-          minimum: 0
-        prazo:
-          type: string
-          format: date
-          nullable: true
-        status:
-          type: string
-          enum: [em_andamento, concluida, atrasada, cancelada]
-        percentual_progresso:
-          type: number
-          format: float
-          readOnly: true
-          description: Calculado pelo Back-end (valor_atual / valor_alvo)
-
+          maxLength: 80
     EntradaMetaFinanceira:
       type: object
-      required: [nome, valor_alvo]
+      required:
+      - nome
+      - valor_desejado
+      - categoria_id
       properties:
         nome:
           type: string
-        valor_alvo:
-          type: number
-          format: double
-          minimum: 0
-          exclusiveMinimum: true
-        valor_atual:
+          maxLength: 100
+        descricao:
+          type: string
+          nullable: true
+        valor_inicio:
           type: number
           format: double
           minimum: 0
           default: 0
-        prazo:
-          type: string
-          format: date
-
-    AtualizacaoMetaFinanceira:
-      type: object
-      minProperties: 1
-      properties:
-        nome:
-          type: string
-        valor_alvo:
+          description: Valor de partida da meta
+        valor_desejado:
           type: number
           format: double
           minimum: 0
           exclusiveMinimum: true
-        valor_atual:
+          description: Valor-alvo a atingir
+        valor_total:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+          description: Valor acumulado até o momento
+        data_alvo:
+          type: string
+          format: date-time
+          nullable: true
+        categoria_id:
+          type: integer
+          format: int32
+        status:
+          $ref: '#/components/schemas/StatusMeta'
+    AtualizacaoMetaFinanceira:
+      type: object
+      properties:
+        nome:
+          type: string
+          maxLength: 100
+        descricao:
+          type: string
+          nullable: true
+        valor_inicio:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+          description: Valor de partida da meta
+        valor_desejado:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          description: Valor-alvo a atingir
+        valor_total:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+          description: Valor acumulado até o momento
+        data_alvo:
+          type: string
+          format: date-time
+          nullable: true
+        categoria_id:
+          type: integer
+          format: int32
+        status:
+          $ref: '#/components/schemas/StatusMeta'
+      minProperties: 1
+    MetaFinanceira:
+      type: object
+      required:
+      - id
+      - nome
+      - valor_inicio
+      - valor_desejado
+      - valor_total
+      - status
+      - categoria_id
+      properties:
+        nome:
+          type: string
+          maxLength: 100
+        descricao:
+          type: string
+          nullable: true
+        valor_inicio:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+          description: Valor de partida da meta
+        valor_desejado:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMinimum: true
+          description: Valor-alvo a atingir
+        valor_total:
+          type: number
+          format: double
+          minimum: 0
+          default: 0
+          description: Valor acumulado até o momento
+        data_alvo:
+          type: string
+          format: date-time
+          nullable: true
+        categoria_id:
+          type: integer
+          format: int32
+        id:
+          type: integer
+          format: int32
+        status:
+          $ref: '#/components/schemas/StatusMeta'
+        categoria:
+          $ref: '#/components/schemas/CategoriaMeta'
+        percentual_progresso:
+          type: number
+          format: float
+          readOnly: true
+          description: Calculado pelo Back-end (valor_total / valor_desejado)
+    EntradaSimulacaoInvestimento:
+      type: object
+      required:
+      - nome
+      - valor_inicial
+      - aporte_mensal
+      - prazo
+      - rentabilidade
+      properties:
+        nome:
+          type: string
+          maxLength: 45
+        descricao:
+          type: string
+          nullable: true
+        valor_inicial:
+          type: number
+          format: double
+          minimum: 0
+        aporte_mensal:
           type: number
           format: double
           minimum: 0
         prazo:
-          type: string
-          format: date
-        status:
-          type: string
-          enum: [em_andamento, concluida, atrasada, cancelada]
-
-    # ---------- Notificações ----------
-    Notificacao:
-      type: object
-      required: [id, titulo, mensagem, lida, criada_em]
-      properties:
-        id:
-          type: string
-          format: uuid
-        tipo:
-          type: string
-        titulo:
-          type: string
-        mensagem:
-          type: string
-        lida:
-          type: boolean
-          description: Estado de leitura (usado no filtro `lida` e no PATCH)
-        lida_em:
-          type: string
-          format: date-time
-          nullable: true
-        criada_em:
-          type: string
-          format: date-time
-
-    # ---------- Comunidade ----------
-    Publicacao:
-      type: object
-      required: [id, usuario_id, texto, criada_em, status]
-      properties:
-        id:
-          type: string
-          format: uuid
-        usuario_id:
-          type: string
-          format: uuid
-        texto:
-          type: string
-        total_curtidas:
           type: integer
-        total_comentarios:
-          type: integer
-        curtida_pelo_usuario:
-          type: boolean
-          description: Indica se o usuário autenticado já curtiu (evita 409 em POST /curtidas)
-        criada_em:
-          type: string
-          format: date-time
-        status:
-          type: string
-          enum: [publicada, removida, moderada]
-
-    EntradaPublicacao:
+          minimum: 1
+          description: Prazo (unidade a confirmar; assumido em meses)
+        rentabilidade:
+          type: number
+          format: double
+          description: Rentabilidade (DECIMAL(5,2))
+    AtualizacaoSimulacaoInvestimento:
       type: object
-      required: [texto]
       properties:
-        texto:
-          type: string
-          minLength: 1
-
-    Comentario:
-      type: object
-      required: [id, publicacao_id, usuario_id, texto, criada_em, status]
-      properties:
-        id:
-          type: string
-          format: uuid
-        publicacao_id:
-          type: string
-          format: uuid
-        usuario_id:
-          type: string
-          format: uuid
-        texto:
-          type: string
-        criada_em:
-          type: string
-          format: date-time
-        status:
-          type: string
-          enum: [publicado, removido, moderado]
-
-    EntradaComentario:
-      type: object
-      required: [texto]
-      properties:
-        texto:
-          type: string
-          minLength: 1
-
-    # ---------- Conquistas / Badges (opcional) ----------
-    Conquista:
-      type: object
-      description: OPCIONAL — expor somente se gamificação estiver no escopo final.
-      properties:
-        id:
-          type: string
-          format: uuid
         nome:
           type: string
-        descricao:
-          type: string
-        icone_url:
-          type: string
-
-    ConquistaUsuario:
-      type: object
-      description: OPCIONAL — expor somente se gamificação estiver no escopo final.
-      properties:
-        conquista_id:
-          type: string
-          format: uuid
-        conquista:
-          $ref: '#/components/schemas/Conquista'
-        obtida_em:
-          type: string
-          format: date-time
-
-    # ---------- IA ----------
-    Conversa:
-      type: object
-      description: Conversa do usuário com o assistente financeiro.
-      required: [id, criado_em, atualizado_em]
-      properties:
-        id:
-          type: string
-          format: uuid
-        titulo:
-          type: string
-          nullable: true
-          maxLength: 120
-          description: Informado pelo usuário ou gerado a partir da primeira mensagem
+          maxLength: 45
         descricao:
           type: string
           nullable: true
-        criado_em:
-          type: string
-          format: date-time
-        atualizado_em:
-          type: string
-          format: date-time
-          description: Usado para ordenar a listagem (mais recente primeiro)
-
-    MensagemIA:
+        valor_inicial:
+          type: number
+          format: double
+          minimum: 0
+        aporte_mensal:
+          type: number
+          format: double
+          minimum: 0
+        prazo:
+          type: integer
+          minimum: 1
+          description: Prazo (unidade a confirmar; assumido em meses)
+        rentabilidade:
+          type: number
+          format: double
+          description: Rentabilidade (DECIMAL(5,2))
+      minProperties: 1
+    SimulacaoInvestimento:
       type: object
-      required: [id, conversa_id, papel, conteudo, criada_em]
+      required:
+      - id
+      - nome
+      - valor_inicial
+      - aporte_mensal
+      - prazo
+      - rentabilidade
+      - data_criacao
+      properties:
+        nome:
+          type: string
+          maxLength: 45
+        descricao:
+          type: string
+          nullable: true
+        valor_inicial:
+          type: number
+          format: double
+          minimum: 0
+        aporte_mensal:
+          type: number
+          format: double
+          minimum: 0
+        prazo:
+          type: integer
+          minimum: 1
+          description: Prazo (unidade a confirmar; assumido em meses)
+        rentabilidade:
+          type: number
+          format: double
+          description: Rentabilidade (DECIMAL(5,2))
+        id:
+          type: integer
+          format: int32
+        data_criacao:
+          type: string
+          format: date-time
+    EntradaSimulacaoAmortizacao:
+      type: object
+      required:
+      - nome
+      - saldo_devedor
+      - prazo
+      - taxa
+      - sistema_calculo
+      - aporte_mensal
+      - modalidade
+      properties:
+        nome:
+          type: string
+          maxLength: 45
+        descricao:
+          type: string
+          nullable: true
+        saldo_devedor:
+          type: number
+          format: double
+          minimum: 0
+        prazo:
+          type: integer
+          minimum: 1
+          description: Prazo (unidade a confirmar; assumido em meses)
+        taxa:
+          type: number
+          format: double
+          description: Taxa (DECIMAL(5,2))
+        sistema_calculo:
+          type: string
+          maxLength: 45
+          description: 'Ex.: PRICE, SAC'
+        aporte_mensal:
+          type: number
+          format: double
+          minimum: 0
+        modalidade:
+          type: string
+          maxLength: 45
+          description: 'Ex.: reduzir prazo, reduzir parcela'
+    AtualizacaoSimulacaoAmortizacao:
+      type: object
+      properties:
+        nome:
+          type: string
+          maxLength: 45
+        descricao:
+          type: string
+          nullable: true
+        saldo_devedor:
+          type: number
+          format: double
+          minimum: 0
+        prazo:
+          type: integer
+          minimum: 1
+          description: Prazo (unidade a confirmar; assumido em meses)
+        taxa:
+          type: number
+          format: double
+          description: Taxa (DECIMAL(5,2))
+        sistema_calculo:
+          type: string
+          maxLength: 45
+          description: 'Ex.: PRICE, SAC'
+        aporte_mensal:
+          type: number
+          format: double
+          minimum: 0
+        modalidade:
+          type: string
+          maxLength: 45
+          description: 'Ex.: reduzir prazo, reduzir parcela'
+      minProperties: 1
+    SimulacaoAmortizacao:
+      type: object
+      required:
+      - id
+      - nome
+      - saldo_devedor
+      - prazo
+      - taxa
+      - sistema_calculo
+      - aporte_mensal
+      - modalidade
+      - data_criacao
+      properties:
+        nome:
+          type: string
+          maxLength: 45
+        descricao:
+          type: string
+          nullable: true
+        saldo_devedor:
+          type: number
+          format: double
+          minimum: 0
+        prazo:
+          type: integer
+          minimum: 1
+          description: Prazo (unidade a confirmar; assumido em meses)
+        taxa:
+          type: number
+          format: double
+          description: Taxa (DECIMAL(5,2))
+        sistema_calculo:
+          type: string
+          maxLength: 45
+          description: 'Ex.: PRICE, SAC'
+        aporte_mensal:
+          type: number
+          format: double
+          minimum: 0
+        modalidade:
+          type: string
+          maxLength: 45
+          description: 'Ex.: reduzir prazo, reduzir parcela'
+        id:
+          type: integer
+          format: int32
+        data_criacao:
+          type: string
+          format: date-time
+    Notificacao:
+      type: object
+      required:
+      - id
+      - nome
+      - conteudo
+      - data_criacao
+      - lida
       properties:
         id:
+          type: integer
+          format: int32
+        icone:
           type: string
-          format: uuid
-        conversa_id:
+          maxLength: 255
+          nullable: true
+        nome:
           type: string
-          format: uuid
-        papel:
-          type: string
-          enum: [usuario, assistente]
+          maxLength: 80
         conteudo:
           type: string
-        criada_em:
+          maxLength: 200
+        data_criacao:
           type: string
           format: date-time
-
+        lida:
+          type: boolean
+    Post:
+      type: object
+      required:
+      - id
+      - autor
+      - conteudo
+      - data_criacao
+      - status
+      properties:
+        id:
+          type: integer
+          format: int32
+        autor:
+          $ref: '#/components/schemas/UsuarioResumo'
+        conteudo:
+          type: string
+        data_criacao:
+          type: string
+          format: date-time
+        data_atualizacao:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum:
+          - publicado
+          - removido
+          - moderado
+          description: Mapeia tbl_post.status (TINYINT). Códigos numéricos a confirmar.
+        total_curtidas:
+          type: integer
+          format: int32
+        total_comentarios:
+          type: integer
+          format: int32
+        curtido_pelo_usuario:
+          type: boolean
+          description: Se o usuário autenticado já curtiu (evita 409 em POST /curtidas)
+    EntradaPost:
+      type: object
+      required:
+      - conteudo
+      properties:
+        conteudo:
+          type: string
+          minLength: 1
+    Comentario:
+      type: object
+      required:
+      - id
+      - post_id
+      - autor
+      - mensagem
+      - data_criacao
+      properties:
+        id:
+          type: integer
+          format: int32
+        post_id:
+          type: integer
+          format: int32
+        autor:
+          $ref: '#/components/schemas/UsuarioResumo'
+        comentario_pai_id:
+          type: integer
+          format: int32
+          nullable: true
+          description: Preenchido quando é resposta a outro comentário
+        mensagem:
+          type: string
+        data_criacao:
+          type: string
+          format: date-time
+        total_curtidas:
+          type: integer
+          format: int32
+        curtido_pelo_usuario:
+          type: boolean
+        total_respostas:
+          type: integer
+          format: int32
+    EntradaComentario:
+      type: object
+      required:
+      - mensagem
+      properties:
+        mensagem:
+          type: string
+          minLength: 1
+        comentario_pai_id:
+          type: integer
+          format: int32
+          nullable: true
+    CategoriaDenuncia:
+      type: object
+      required:
+      - id
+      - nome
+      properties:
+        id:
+          type: integer
+          format: int32
+        nome:
+          type: string
+          maxLength: 40
+    EntradaDenuncia:
+      type: object
+      required:
+      - titulo
+      - categoria_id
+      properties:
+        titulo:
+          type: string
+          maxLength: 100
+        descricao:
+          type: string
+          nullable: true
+        categoria_id:
+          type: integer
+          format: int32
+    Denuncia:
+      type: object
+      required:
+      - id
+      - post_id
+      - titulo
+      - categoria_id
+      - data_criacao
+      properties:
+        id:
+          type: integer
+          format: int32
+        post_id:
+          type: integer
+          format: int32
+        titulo:
+          type: string
+          maxLength: 100
+        descricao:
+          type: string
+          nullable: true
+        categoria_id:
+          type: integer
+          format: int32
+        data_criacao:
+          type: string
+          format: date-time
+    Badge:
+      type: object
+      required:
+      - id
+      - nome
+      - descricao
+      - icone
+      - xp
+      properties:
+        id:
+          type: integer
+          format: int32
+        nome:
+          type: string
+          maxLength: 45
+        descricao:
+          type: string
+        icone:
+          type: string
+          maxLength: 255
+        xp:
+          type: integer
+          format: int32
+    BadgeUsuario:
+      type: object
+      required:
+      - badge
+      - data_conquista
+      properties:
+        badge:
+          $ref: '#/components/schemas/Badge'
+        data_conquista:
+          type: string
+          format: date-time
+    Ranking:
+      type: object
+      required:
+      - posicao
+      - pontos_total
+      - usuario
+      properties:
+        posicao:
+          type: integer
+          format: int32
+        pontos_total:
+          type: integer
+          format: int32
+        usuario:
+          $ref: '#/components/schemas/UsuarioResumo'
+    Chat:
+      type: object
+      description: Chat do usuário com o assistente (tbl_chat; vínculo em tbl_usuario_chat).
+      required:
+      - id
+      - nome
+      - data_criacao
+      properties:
+        id:
+          type: integer
+          format: int32
+        nome:
+          type: string
+          maxLength: 45
+        data_criacao:
+          type: string
+          format: date-time
+    MensagemChat:
+      type: object
+      required:
+      - id
+      - chat_id
+      - papel
+      - conteudo
+      - data_envio
+      properties:
+        id:
+          type: integer
+          format: int32
+        chat_id:
+          type: integer
+          format: int32
+        papel:
+          type: string
+          enum:
+          - usuario
+          - assistente
+          description: 'ATENÇÃO: o modelo lógico não tem coluna para isso (tbl_mensagem.id_usuario é obrigatório).
+            Ver observações de ajuste do modelo.'
+        conteudo:
+          type: string
+        data_envio:
+          type: string
+          format: date-time
     ListaMensagens:
       type: object
-      description: >
-        Página de mensagens com paginação por cursor. Mensagens ordenadas da
-        mais antiga para a mais recente dentro da página.
-      required: [mensagens, tem_mais]
+      description: Página de mensagens com paginação por cursor, da mais antiga para a mais recente.
+      required:
+      - mensagens
+      - tem_mais
       properties:
         mensagens:
           type: array
           items:
-            $ref: '#/components/schemas/MensagemIA'
+            $ref: '#/components/schemas/MensagemChat'
         proximo_cursor:
-          type: string
-          format: uuid
+          type: integer
+          format: int32
           nullable: true
-          description: Enviar como `antes_de` para carregar as mensagens mais antigas. Nulo quando não há mais páginas.
+          description: Enviar como `antes_de` para carregar as mais antigas. Nulo quando não há mais páginas.
         tem_mais:
           type: boolean
-          description: Indica se existem mensagens anteriores a esta página
-
     RespostaEnvioMensagem:
       type: object
-      required: [mensagem_usuario, mensagem_assistente]
+      required:
+      - mensagem_usuario
+      - mensagem_assistente
       properties:
         mensagem_usuario:
-          $ref: '#/components/schemas/MensagemIA'
+          $ref: '#/components/schemas/MensagemChat'
         mensagem_assistente:
-          $ref: '#/components/schemas/MensagemIA'
-
-    RecomendacaoIA:
+          $ref: '#/components/schemas/MensagemChat'
+    StatusRecomendacao:
+      type: string
+      enum:
+      - pendente
+      - aceita
+      - descartada
+      description: Mapeia tbl_recomendacao_ia.status (TINYINT). Valores a confirmar.
+    CategoriaRecomendacao:
       type: object
-      description: Histórico persistido em recomendacoes_ia.
+      required:
+      - id
+      - nome
       properties:
         id:
+          type: integer
+          format: int32
+        nome:
           type: string
-          format: uuid
-        contexto:
+          maxLength: 80
+    RecomendacaoIA:
+      type: object
+      required:
+      - id
+      - titulo
+      - descricao
+      - data_criacao
+      - status
+      properties:
+        id:
+          type: integer
+          format: int32
+        titulo:
           type: string
-        recomendacao:
+          maxLength: 45
+        descricao:
           type: string
-        criada_em:
+        impacto:
+          type: string
+          maxLength: 45
+        data_criacao:
           type: string
           format: date-time
-
+        status:
+          $ref: '#/components/schemas/StatusRecomendacao'
+        categoria:
+          $ref: '#/components/schemas/CategoriaRecomendacao'
