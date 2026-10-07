@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>FIMAP API - Documentação</title>
+  <link rel="stylesheet" href="https://unpkg.com" />
+</head>
+<body>
+
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com"></script>
+  <script src="https://unpkg.com"></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: 'openapi.yaml', // O seu arquivo YAML precisa estar na mesma pasta
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "StandaloneLayout"
+      });
+    };
+  </script>
+</body>
+</html>
