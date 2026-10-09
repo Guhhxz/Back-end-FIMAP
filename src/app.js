@@ -1,17 +1,46 @@
-//importando as dependencias
-const express       = require("express")
-const cors          = require("cors")
-const bodyParser    = require("body-parser")
+// Importando as dependências
+require("dotenv").config()
 
-//criando um objeto para manipular o express
+const express = require("express")
+const cors = require("cors")
+
+// Importando as rotas
+const openFinanceRoutes = require("./routes/openFinanceRoutes")
+
+// Criando a aplicação
 const app = express()
 
-//conjunto de permissões a serem aplicados no CORS da API
+// Configurando o CORS
 const corsOption = {
-    origin: ["*"], //A origrm da requisição (definido por meio do IP (192.168...), quando colocado o "*" fica livre para todas as máquinas)
-    methods: "GET, POST, PUT, DELETE, OPTION", //são os verbos permitidos para serem utilizados na API
-    allowedHeaders: ["content-type", "Autorizations"] //são permissões do cabeçalho do CORS
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
 }
 
-//configurando as permissões da API atravez do CORS
+// Aplicando os middlewares
 app.use(cors(corsOption))
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// Rota inicial
+app.get("/", (req, res) => {
+    res.status(200).json({
+        mensagem: "API funcionando!",
+        status: "online"
+    })
+})
+
+
+// Rotas do Open Finance
+app.use("/v1/openfinance", openFinanceRoutes)
+
+
+
+
+
+// Inicializando o servidor
+const PORT = process.env.PORT || 8080
+
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`)
+})
