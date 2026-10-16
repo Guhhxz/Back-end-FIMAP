@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <button id="abrir">Conectar banco</button>
+
+  <script src="https://cdn.pluggy.ai/pluggy-connect/v2.7.0/pluggy-connect.js"></script>
+  <script>
+    document.getElementById("abrir").onclick = async () => {
+      const resp = await fetch("http://localhost:8080/v1/openfinance/connect-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientUserId: "usuario-123" })
+      })
+      const { accessToken } = await resp.json()
+
+      const connect = new PluggyConnect({
+        connectToken: accessToken,
+        includeSandbox: true,
+        onSuccess: async (data) => {
+        const itemId = data.item.id
+        console.log("itemId:", itemId)
+
+        const r = await fetch(`http://localhost:8080/v1/openfinance/saldo/${itemId}`)
+        const saldo = await r.json()
+        console.log("Saldo:", saldo)
+        alert("Saldo total: R$ " + saldo.saldoTotal)
+    },
+        onError: (err) => console.error("Erro:", err)
+      })
+      connect.init()
+    }
+  </script>
+</body>
+</html>

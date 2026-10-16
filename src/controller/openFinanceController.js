@@ -26,6 +26,28 @@ async function gerarConnectToken(req, res) {
     }
 }
 
-module.exports = {
-    gerarConnectToken
+async function obterSaldo(req, res) {
+    try {
+        const { itemId } = req.params
+
+        if (!itemId) {
+            return res.status(400).json({ erro: "Informe o itemId." })
+        }
+
+        const resultado = await pluggyService.buscarSaldo(itemId)
+
+        if (resultado.atualizando) {
+            return res.status(202).json({
+                mensagem: "Conexão ainda sincronizando. Tente novamente em alguns segundos."
+            })
+        }
+
+        return res.status(200).json(resultado)
+    } catch (error) {
+        console.error("Erro ao buscar saldo:", error)
+        return res.status(500).json({ erro: "Não foi possível buscar o saldo." })
+    }
 }
+
+module.exports = { gerarConnectToken, obterSaldo }
+

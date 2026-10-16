@@ -1,27 +1,37 @@
-const pluggyConfig = require("../config/pluggy.js")
+const pluggy = require("../config/pluggy")
 
-async function gerarConnectToken(req, res) {
-    try {
-        const { clientUserId } = req.body
+async function criarConnectToken(clientUserId) {
+    const connectToken = await pluggy.createConnectToken(undefined, {
+        clientUserId
+    })
 
-        if (!clientUserId || typeof clientUserId !== "string") {
-            return res.status(400).json({
-                erro: "Informe um clientUserId válido."
-            })
-        }
-
-        const accessToken = await pluggyConfig.criarConnectToken(
-            clientUserId
-        )
-
-        return res.status(200).json({ accessToken })
-    } catch (error) {
-        console.error("Erro ao gerar Connect Token:", error.message)
-
-        return res.status(500).json({
-            erro: "Erro ao gerar o Connect Token."
-        })
-    }
+    return connectToken.accessToken
 }
 
-module.exports = { gerarConnectToken }
+async function buscarSaldo(itemId) {
+    const item = await pluggy.fetchItem(itemId)
+
+    // Logo após conectar, o item pode ainda estar sincronizando
+    if (item.status === "UPDATING") {
+        return { atualizando: true }
+    }
+
+    const contas = await pluggy.fetchAccounts(itemId)
+
+    const listaContas = contas.results.map((conta) => ({
+        id: conta.id,
+        nome: conta.name,
+        tipo: conta.type,          // BANK (conta) ou CREDIT (cartão)
+        subtipo: conta.subtype,
+        saldo: conta.balance,
+        moeda: conta.currencyCode
+    }))
+
+    const saldoTotal = listaContas
+        .filter((conta) => conta.tipo === "BANK")
+        .reduce((total, conta) => total + conta.saldo, 0)
+
+    return { atualizando: false, saldoTotal, contas: listaContas }
+}
+
+module.exports = { criarConnectToken, buscarSaldo }

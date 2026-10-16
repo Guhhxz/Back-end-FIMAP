@@ -1,13 +1,8 @@
-const pluggy = require("../config/pluggy")
+const { PluggyClient } = require("pluggy-sdk")
 
-async function criarConnectToken(clientUserId) {
-    const connectToken = await pluggy.createConnectToken({
-        clientUserId
-    })
+const pluggy = new PluggyClient({
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET
+})
 
-    return connectToken.accessToken
-}
-
-module.exports = {
-    criarConnectToken
-}
+module.exports = pluggy

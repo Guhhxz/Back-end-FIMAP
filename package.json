@@ -2,9 +2,11 @@
   "dependencies": {
     "body-parser": "^2.3.0",
     "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
     "express": "^5.2.1",
     "knex": "^3.3.0",
     "mysql": "^2.18.1",
-    "mysql2": "^3.24.4"
+    "mysql2": "^3.24.4",
+    "pluggy-sdk": "^0.92.0"
   }
 }
