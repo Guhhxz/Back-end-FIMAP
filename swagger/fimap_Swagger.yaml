@@ -8,7 +8,7 @@ info:
     sob demanda no provedor de Open Finance, normalizados e devolvidos — NÃO existe espelhamento local. Os endpoints
     do grupo "Dados Financeiros" são somente leitura. Convenções: IDs são inteiros (INT); colunas id_* do banco
     aparecem como *_id; campos TINYINT de status/visibilidade são expostos como enums de texto.'
-  version: 3.0.0
+  version: 3.0.0a
   contact:
     name: Equipe FIMAP
 servers:

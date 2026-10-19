@@ -1,4 +1,4 @@
-const pluggyService = require("../services/pluggyService")
+const pluggyService = require("../../services/pluggyService")
 
 async function gerarConnectToken(req, res) {
     try {
