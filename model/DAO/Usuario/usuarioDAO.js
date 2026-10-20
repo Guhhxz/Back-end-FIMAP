@@ -1,6 +1,8 @@
-const knex = require('knex')
-// Import do arquivo de configuração que contém as credenciais e parâmetros de conexão com o banco
 
+const knex = require('knex')
+const brycrypt = require('bcrypt')
+
+// Import do arquivo de configuração do banco de dados
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 
 const knexConex = knex(knexConfig.development)
@@ -8,24 +10,26 @@ const knexConex = knex(knexConfig.development)
 // Criar usuário
 const CreateUsers = async (usuario) => {
     try {
-        const [id_usuario] = await knexConex('tbl_usuario').insert({
+
+        const senhaHash = await brycrypt.hash(usuario.senha, 10)
+
+        const [id] = await knexConex('tbl_usuario').insert({
             nome: usuario.nome,
             cpf: usuario.cpf,
             email: usuario.email,
             username: usuario.username,
-            senha: usuario.senha,
+            senha: senhaHash,
             xp_usuario: usuario.xp_usuario ?? 0,
             nivel_total: usuario.nivel_total ?? 1,
             foto_perfil: usuario.foto_perfil ?? null,
-            nome_exibido: usuario.nome_exibido ?? null,
+            nome_exibicao: usuario.nome_exibicao ?? usuario.nome_exibido ?? null,
             username_social: usuario.username_social ?? null,
-            biografia: usuario.biografia ?? null,
-            social: usuario.social ?? null,
+            biografia_social: usuario.biografia_social ?? usuario.biografia ?? null,
             localizacao_estado: usuario.localizacao_estado ?? null,
             visibilidade: usuario.visibilidade ?? 1
         })
 
-        return id_usuario
+        return id
     } catch (error) {
         console.error('Erro ao criar usuário:', error)
         return false
@@ -35,24 +39,32 @@ const CreateUsers = async (usuario) => {
 // Atualizar usuário
 const UpdateUsers = async (usuario) => {
     try {
+        const dadosAtualizados = {
+            nome: usuario.nome,
+            cpf: usuario.cpf,
+            email: usuario.email,
+            username: usuario.username,
+            senha: usuario.senha,
+            xp_usuario: usuario.xp_usuario,
+            nivel_total: usuario.nivel_total,
+            foto_perfil: usuario.foto_perfil,
+            nome_exibicao: usuario.nome_exibicao ?? usuario.nome_exibido,
+            username_social: usuario.username_social,
+            biografia_social: usuario.biografia_social ?? usuario.biografia,
+            localizacao_estado: usuario.localizacao_estado,
+            visibilidade: usuario.visibilidade
+        }
+
+        // Remove campos undefined para não sobrescrever dados existentes
+        Object.keys(dadosAtualizados).forEach((campo) => {
+            if (dadosAtualizados[campo] === undefined) {
+                delete dadosAtualizados[campo]
+            }
+        })
+
         const resultado = await knexConex('tbl_usuario')
-            .where('id_usuario', usuario.id_usuario)
-            .update({
-                nome: usuario.nome,
-                cpf: usuario.cpf,
-                email: usuario.email,
-                username: usuario.username,
-                senha: usuario.senha,
-                xp_usuario: usuario.xp_usuario,
-                nivel_total: usuario.nivel_total,
-                foto_perfil: usuario.foto_perfil,
-                nome_exibido: usuario.nome_exibido,
-                username_social: usuario.username_social,
-                biografia: usuario.biografia,
-                social: usuario.social,
-                localizacao_estado: usuario.localizacao_estado,
-                visibilidade: usuario.visibilidade
-            })
+            .where('id', usuario.id ?? usuario.id_usuario)
+            .update(dadosAtualizados)
 
         return resultado > 0
     } catch (error) {
@@ -71,7 +83,7 @@ const DeleteUsers = async (id_usuario) => {
         }
 
         const resultado = await knexConex('tbl_usuario')
-            .where('id_usuario', id)
+            .where('id', id)
             .del()
 
         return resultado > 0
@@ -98,7 +110,22 @@ const GetUsuarioByUsername = async (username) => {
 // Buscar todos os usuários
 const GetAllUsers = async () => {
     try {
-        return await knexConex('tbl_usuario').select('*')
+        return await knexConex('tbl_usuario')
+            .select(
+                'id',
+                'nome',
+                'cpf',
+                'email',
+                'username',
+                'xp_usuario',
+                'nivel_total',
+                'foto_perfil',
+                'nome_exibicao',
+                'username_social',
+                'biografia_social',
+                'localizacao_estado',
+                'visibilidade'
+            )
     } catch (error) {
         console.error('Erro ao buscar todos os usuários:', error)
         return []
@@ -109,8 +136,7 @@ const GetAllUsers = async () => {
 const ValidarUser = async (usuario) => {
     try {
         const consulta = knexConex('tbl_usuario')
-
-        consulta.where('email', usuario.email)
+            .where('email', usuario.email)
 
         if (usuario.cpf) {
             consulta.orWhere('cpf', usuario.cpf)

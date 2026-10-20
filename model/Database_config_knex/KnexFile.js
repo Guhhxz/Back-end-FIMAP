@@ -6,7 +6,7 @@ module.exports = {
         host: 'localhost', 
         user: 'root', 
         password: '12345678', 
-        database: 'Script_Fimap',
+        database: 'db_fimap_2026',
         port: 3306, // Porta padrão do MySQL
        
         // Opcional: Define charset (recomendado para UTF8)
