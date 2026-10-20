@@ -8,6 +8,7 @@ const cors = require("cors")
 
 // Importando as rotas
 const openFinanceRoutes = require("./routes/openFinanceRoutes")
+const usuarioRoutes = require("./routes/usuarioRoutes.js")
 
 // Criando a aplicação
 const app = express()
@@ -35,6 +36,8 @@ app.get("/", (req, res) => {
 
 // Rotas do Open Finance
 app.use("/v1/openfinance", openFinanceRoutes)
+
+app.use("/v1/openfinance/usuario", usuarioRoutes)
 
 
 
