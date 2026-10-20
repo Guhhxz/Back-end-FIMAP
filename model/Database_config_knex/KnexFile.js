@@ -1,6 +1,6 @@
 module.exports = {
     development: {
-      // ⚠️ ALTERAÇÃO: Define o cliente como 'mysql2'
+      // ALTERAÇÃO: Define o cliente como 'mysql2'
       client: 'mysql2',
       connection: {
         host: 'localhost', 
