@@ -8,7 +8,7 @@ info:
     sob demanda no provedor de Open Finance, normalizados e devolvidos — NÃO existe espelhamento local. Os endpoints
     do grupo "Dados Financeiros" são somente leitura. Convenções: IDs são inteiros (INT); colunas id_* do banco
     aparecem como *_id; campos TINYINT de status/visibilidade são expostos como enums de texto.'
-  version: 3.0.0a
+  version: 3.0.0
   contact:
     name: Equipe FIMAP
 servers:
@@ -373,6 +373,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erro'
+    delete:
+      operationId: deletarConta
+      tags:
+      - Perfil
+      summary: Excluir conta do usuário autenticado (LGPD)
+      description: Remove permanentemente o registro em tbl_usuario e exclui/desvincula em cascata os dados associados.
+      responses:
+        '204':
+          description: Conta excluída com sucesso
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
   /usuarios/{usuarioId}:
     parameters:
     - $ref: '#/components/parameters/UsuarioId'
@@ -1746,8 +1757,7 @@ paths:
       tags:
       - IA
       summary: Criar novo chat com o assistente financeiro (tbl_chat)
-      description: Cria o chat e vincula o usuário autenticado em tbl_usuario_chat. Se `nome` não for informado,
-        o Back-end gera um a partir da primeira mensagem.
+      description: Cria o registro em tbl_chat associado ao usuário autenticado (tbl_chat.id_usuario). Se `nome` não for informado, o Back-end gera um a partir da primeira mensagem.
       requestBody:
         required: false
         content:
@@ -1779,8 +1789,7 @@ paths:
       tags:
       - IA
       summary: Listar chats do usuário
-      description: Chats em que o usuário é participante (tbl_usuario_chat), do mais recente para o mais antigo
-        (última mensagem).
+      description: Chats em que o usuário é o proprietário (tbl_chat.id_usuario), do mais recente para o mais antigo (última mensagem).
       parameters:
       - $ref: '#/components/parameters/Pagina'
       - $ref: '#/components/parameters/TamanhoPagina'
@@ -2227,7 +2236,7 @@ components:
       required:
       - nome
       - sistema_operacional
-      - mac
+      - identificador
       properties:
         nome:
           type: string
@@ -2235,9 +2244,9 @@ components:
         sistema_operacional:
           type: string
           maxLength: 24
-        mac:
+        identificador:
           type: string
-          maxLength: 20
+          maxLength: 64
     RequisicaoLogin:
       type: object
       required:
@@ -2452,9 +2461,11 @@ components:
         sistema_operacional:
           type: string
           maxLength: 24
-        mac:
+        identificador:
           type: string
-          maxLength: 20
+          maxLength: 64
+          nullable: true
+          description: Mapeia tbl_dispositivo.identificador.
         data_cadastro:
           type: string
           format: date-time
@@ -2517,8 +2528,7 @@ components:
       properties:
         instituicao_id_externo:
           type: string
-          description: Instituição no provedor. Usada para iniciar o consentimento; hoje não existe coluna para
-            persisti-la.
+          description: Identificador da instituição no provedor. Mapeia tbl_conexao_open_finance.external_connection_id e provedor.
     ResumoFinanceiro:
       type: object
       description: Agregado em tempo real — não corresponde a tabela local.
@@ -3244,7 +3254,7 @@ components:
           $ref: '#/components/schemas/UsuarioResumo'
     Chat:
       type: object
-      description: Chat do usuário com o assistente (tbl_chat; vínculo em tbl_usuario_chat).
+      description: Chat do usuário com o assistente.
       required:
       - id
       - nome
@@ -3279,8 +3289,7 @@ components:
           enum:
           - usuario
           - assistente
-          description: 'ATENÇÃO: o modelo lógico não tem coluna para isso (tbl_mensagem.id_usuario é obrigatório).
-            Ver observações de ajuste do modelo.'
+          description: Mapeia tbl_mensagem.papel (TINYINT).
         conteudo:
           type: string
         data_envio:
@@ -3320,7 +3329,7 @@ components:
       - pendente
       - aceita
       - descartada
-      description: Mapeia tbl_recomendacao_ia.status (TINYINT). Valores a confirmar.
+      description: Mapeia tbl_recomendacao_ia.status (TINYINT).
     CategoriaRecomendacao:
       type: object
       required:
