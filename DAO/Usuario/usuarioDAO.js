@@ -142,22 +142,10 @@ const GetAllUsers = async () => {
     }
 }
 
-const validarDados = async function(filme) {
-    try {
-        if (
-            filme.nome == undefined || filme.nome == '' ||
-            filme.data_lancamento == undefined || filme.data_lancamento == '' ||
-            filme.duracao == undefined || filme.duracao == '' ||
-            filme.sinopse == undefined || filme.sinopse == '' ||
-            filme.valor == undefined || filme.valor == '' ||
-            filme.capa == undefined || filme.capa == ''
-        ) {
-            return false
-        } else {
-            return true
-        }
-    } catch (error) {
-        console.error('Erro ao validar dados do filme:', error)
-        return false
-    }
+module.exports = {
+    CreateUsers,
+    UpdateUsers,
+    DeleteUsers,
+    GetUsuarioByUsername,
+    GetAllUsers
 }
