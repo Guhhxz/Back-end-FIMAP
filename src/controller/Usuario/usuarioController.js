@@ -50,16 +50,25 @@ const criarUsuario = async (req, res) => {
 // Atualizar usuário
 const atualizarUsuario = async (req, res) => {
     try {
-        const usuario = {
-            ...req.body,
-            id_usuario: Number(req.params.id_usuario)
-        }
+        const id_usuario = Number(req.params.id_usuario)
 
-        if (!Number.isInteger(usuario.id_usuario) || usuario.id_usuario <= 0) {
+        if (!Number.isInteger(id_usuario) || id_usuario <= 0) {
             return res.status(400).json({
                 sucesso: false,
                 mensagem: 'ID do usuário inválido.'
             })
+        }
+
+        if (!req.body || Object.keys(req.body).length === 0) {
+            return res.status(400).json({
+                sucesso: false,
+                mensagem: 'Informe ao menos um campo para atualizar.'
+            })
+        }
+
+        const usuario = {
+            ...req.body,
+            id_usuario
         }
 
         const usuarioAtualizado = await usuarioModel.UpdateUsers(usuario)
