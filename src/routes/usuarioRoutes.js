@@ -4,8 +4,11 @@ const router = express.Router()
 const usuarioController = require("../controller/Usuario/usuarioController.js")
 
 router.post("/criar-usuario", usuarioController.criarUsuario)
-router.get("/usuario/:id_usuario", usuarioController.buscarUsuarioPorUsername)
+router.get("/usuario/:username", usuarioController.buscarUsuarioPorUsername)
 router.get("/usuarios", usuarioController.buscarTodosUsuarios)
 router.delete("/usuario-delete/:id_usuario", usuarioController.deletarUsuario)
 
 module.exports = router
+
+
+//http://localhost:8080/v1/openfinance/usuario/{a rota aq}
