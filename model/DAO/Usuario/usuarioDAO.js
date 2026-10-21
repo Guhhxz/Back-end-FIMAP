@@ -10,7 +10,6 @@ const knexConex = knex(knexConfig.development)
 // Criar usuário
 const CreateUsers = async (usuario) => {
     try {
-
         const senhaHash = await brycrypt.hash(usuario.senha, 10)
 
         const [id] = await knexConex('tbl_usuario').insert({
@@ -19,14 +18,14 @@ const CreateUsers = async (usuario) => {
             email: usuario.email,
             username: usuario.username,
             senha: senhaHash,
-            xp_usuario: usuario.xp_usuario ?? 0,
-            nivel_total: usuario.nivel_total ?? 1,
-            foto_perfil: usuario.foto_perfil ?? null,
-            nome_exibicao: usuario.nome_exibicao ?? usuario.nome_exibido ?? null,
-            username_social: usuario.username_social ?? null,
-            biografia_social: usuario.biografia_social ?? usuario.biografia ?? null,
-            localizacao_estado: usuario.localizacao_estado ?? null,
-            visibilidade: usuario.visibilidade ?? 1
+            xp_usuario: usuario.xp_usuario,
+            nivel_total: usuario.nivel_total,
+            foto_perfil: usuario.foto_perfil,
+            nome_exibicao: usuario.nome_exibicao,
+            username_social: usuario.username_social,
+            biografia_social: usuario.biografia_social,
+            localizacao_estado: usuario.localizacao_estado,
+            visibilidade: usuario.visibilidade
         })
 
         return id
@@ -39,40 +38,57 @@ const CreateUsers = async (usuario) => {
 // Atualizar usuário
 const UpdateUsers = async (usuario) => {
     try {
-        const dadosAtualizados = {
-            nome: usuario.nome,
-            cpf: usuario.cpf,
-            email: usuario.email,
-            username: usuario.username,
-            senha: usuario.senha,
-            xp_usuario: usuario.xp_usuario,
-            nivel_total: usuario.nivel_total,
-            foto_perfil: usuario.foto_perfil,
-            nome_exibicao: usuario.nome_exibicao ?? usuario.nome_exibido,
-            username_social: usuario.username_social,
-            biografia_social: usuario.biografia_social ?? usuario.biografia,
-            localizacao_estado: usuario.localizacao_estado,
-            visibilidade: usuario.visibilidade
-        }
+        const camposPermitidos = [
+            'nome',
+            'cpf',
+            'email',
+            'username',
+            'senha',
+            'xp_usuario',
+            'nivel_total',
+            'foto_perfil',
+            'nome_exibicao',
+            'username_social',
+            'biografia_social',
+            'localizacao_estado',
+            'visibilidade'
+        ]
 
-        // Remove campos undefined para não sobrescrever dados existentes
-        Object.keys(dadosAtualizados).forEach((campo) => {
-            if (dadosAtualizados[campo] === undefined) {
-                delete dadosAtualizados[campo]
+        const dadosAtualizados = {}
+
+        camposPermitidos.forEach((campo) => {
+            if (usuario[campo] !== undefined) {
+                dadosAtualizados[campo] = usuario[campo]
             }
         })
 
+        // Compatibilidade com nomes alternativos
+        if (dadosAtualizados.nome_exibicao === undefined) {
+            if (usuario.nome_exibido !== undefined) {
+                dadosAtualizados.nome_exibicao = usuario.nome_exibido
+            }
+        }
+
+        if (dadosAtualizados.biografia_social === undefined) {
+            if (usuario.biografia !== undefined) {
+                dadosAtualizados.biografia_social = usuario.biografia
+            }
+        }
+
+        if (Object.keys(dadosAtualizados).length === 0) {
+            return false
+        }
+
         const resultado = await knexConex('tbl_usuario')
-            .where('id', usuario.id ?? usuario.id_usuario)
+            .where('id', usuario.id_usuario)
             .update(dadosAtualizados)
 
         return resultado > 0
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error)
-        return false
+        throw error
     }
 }
-
 // Deletar usuário
 const DeleteUsers = async (id_usuario) => {
     try {
