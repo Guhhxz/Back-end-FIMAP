@@ -5,154 +5,92 @@ const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
 const CreateBadge = async (badge) => {
+    let sql = `insert into tbl_badge
+            (icone, nome, descricao, xp)
+            values (?, ?, ?, ?)`
     try {
 
-        const [id] = await knexConex('tbl_usuario').insert({
-            icone: badge.icone,
-            nome: badge.nome,
-            descricao: badge.descricao,
-            xp: badge.xp
-        })
+        const [id] = await knexConex.raw(sql, [
+            badge.icone,
+            badge.nome,
+            badge.descricao,
+            badge.xp
+        ])
 
-        return id
+        if (result) return result[0].insertId
+
     } catch (error) {
-        console.error('Erro ao criar usuário:', error)
+        console.error('Erro ao criar badge:', error)
         return false
     }
 }
 
-// Atualizar usuário
-const UpdateUsers = async (usuario) => {
-    try {
-        const camposPermitidos = [
-            'nome',
-            'cpf',
-            'email',
-            'username',
-            'senha',
-            'xp_usuario',
-            'nivel_total',
-            'foto_perfil',
-            'nome_exibicao',
-            'username_social',
-            'biografia_social',
-            'localizacao_estado',
-            'visibilidade'
-        ]
+// Atualizar badge
+const UpdateBadge = async (badge) => {
+    let sql = `update tbl_badge 
+        set icone = ?, nome = ?, descricao = ?, xp = ?
+        where id = ?`
 
-        const dadosAtualizados = {}
+    try{
+        let result = await knexConex.raw(sql, [
+            badge.icone,
+            badge.nome,
+            badge.descricao,
+            badge.xp
 
-        camposPermitidos.forEach((campo) => {
-            if (usuario[campo] !== undefined) {
-                dadosAtualizados[campo] = usuario[campo]
-            }
-        })
+        ])
 
-        // Compatibilidade com nomes alternativos
-        if (dadosAtualizados.nome_exibicao === undefined) {
-            if (usuario.nome_exibido !== undefined) {
-                dadosAtualizados.nome_exibicao = usuario.nome_exibido
-            }
-        }
+        if (result) return result[0]
 
-        if (dadosAtualizados.biografia_social === undefined) {
-            if (usuario.biografia !== undefined) {
-                dadosAtualizados.biografia_social = usuario.biografia
-            }
-        }
-
-        if (Object.keys(dadosAtualizados).length === 0) {
-            return false
-        }
-
-        const resultado = await knexConex('tbl_usuario')
-            .where('id', usuario.id_usuario)
-            .update(dadosAtualizados)
-
-        return resultado > 0
     } catch (error) {
-        console.error('Erro ao atualizar usuário:', error)
-        throw error
+        console.error('Erro ao atualizar Badge:', error)
+        return false
     }
 }
-// Deletar usuário
-const DeleteUsers = async (id_usuario) => {
-    try {
-        const id = Number(id_usuario)
+// Deletar badge
+const DeleteBadge = async (badge) => {
+    let sql = `delete tbl_badge where id = ?`
 
-        if (!Number.isInteger(id) || id <= 0) {
-            return false
-        }
+    try{
+        let result = await knexConex.raw(sql, [id])
+        
+        if (result) return result[0]
 
-        const resultado = await knexConex('tbl_usuario')
-            .where('id', id)
-            .del()
-
-        return resultado > 0
-    } catch (error) {
-        console.error('Erro ao deletar usuário:', error)
+    }catch (error) {
+        console.error('Erro ao deletar badge:'. error)
         return false
     }
 }
 
-// Buscar usuário pelo username
-const GetUsuarioByUsername = async (username) => {
-    try {
-        const usuario = await knexConex('tbl_usuario')
-            .where('username', username)
-            .first()
+// Buscar badge pelo nome
+const GetBadgeByNome = async (nome) => {
+     let sql = `select * from tbl_badge
+        where nome = ?`
 
-        return usuario || null
+    try {
+        let result = await knexConex.raw(sql, [nome])
+
+        if (result) return result[0][0] || null
     } catch (error) {
-        console.error('Erro ao buscar usuário por username:', error)
+        console.error('Erro ao buscar badge por nome:', error)
         return null
     }
 }
 
-// Buscar todos os usuários
-const GetAllUsers = async () => {
+// Buscar todas as Badges
+const GetAllBadges = async () => {
+    let sql = `select * from tbl_badge` 
     try {
-        return await knexConex('tbl_usuario')
+        return await knexConex('tbl_badge')
             .select(
                 'id',
+                'icone',
                 'nome',
-                'cpf',
-                'email',
-                'username',
-                'xp_usuario',
-                'nivel_total',
-                'foto_perfil',
-                'nome_exibicao',
-                'username_social',
-                'biografia_social',
-                'localizacao_estado',
-                'visibilidade'
+                'descricao',
+                'xp'
             )
     } catch (error) {
-        console.error('Erro ao buscar todos os usuários:', error)
-        return []
-    }
-}
-
-// Verificar se email, CPF ou username já existem
-const ValidarUser = async (usuario) => {
-    try {
-        const consulta = knexConex('tbl_usuario')
-            .where('email', usuario.email)
-
-        if (usuario.cpf) {
-            consulta.orWhere('cpf', usuario.cpf)
-        }
-
-        if (usuario.username) {
-            consulta.orWhere('username', usuario.username)
-        }
-
-        const resultado = await consulta.first()
-
-        return Boolean(resultado)
-    } catch (error) {
-        console.error('Erro ao validar usuário:', error)
-        throw error
+        console.error('Erro ao buscar todas as badges:', error)
+        return false
     }
 }
