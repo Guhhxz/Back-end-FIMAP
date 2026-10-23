@@ -174,7 +174,7 @@ const ValidarUser = async (usuario) => {
             valores.push(usuario.email)
         }
 
-        if (usuario.cpf) {
+        if  (usuario.cpf) {
             condicoes.push('cpf = ?')
             valores.push(usuario.cpf)
         }
