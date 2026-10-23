@@ -64,7 +64,7 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
         .where({ id_chat: chatId })
         .where('id', '<', idUsuario)
         .orderBy('id', 'desc')
-        .limit(9)
+        .limit(1)
 
     const mensagens = [{
         role: 'system',

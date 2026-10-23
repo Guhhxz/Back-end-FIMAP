@@ -1,1 +1,2 @@
-﻿// TODO: implementar conforme swagger/fimap_Swagger.yaml
+﻿const recomendacaoDAO = require('../../../model/DAO/RecomendacaoIA/RecomendacaoIADAO.js')
+
