@@ -2,7 +2,7 @@
 const config_message = require('../modulo/configMensagens.js')
 
 // Importa o DAO responsável pelo acesso ao banco de dados.
-const BadgeModel = require('../../../model/DAO/Badge/badgeDAO.js')
+const BadgeModel = require('../../../model/DAO/Badge/badgeDao.js')
 
 // Criar badge
 const criarBadge = async (req, res) => {
