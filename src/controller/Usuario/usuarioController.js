@@ -1,48 +1,43 @@
 const config_message = require('../modulo/configMensagens.js')
 
-// Importa o DAO (Data Access Object), que é responsável por
-// acessar diretamente o banco de dados e executar as operações CRUD.
-const usuarioModel = require('../..//../model/DAO/Usuario/usuarioDAO.js')
-
-// Importação do body-parser (não está sendo utilizado diretamente neste arquivo,
-// mas geralmente serve para trabalhar com requisições JSON no Node.js)
-const { json } = require('body-parser')
+// Importa o DAO responsável pelo acesso ao banco de dados.
+const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
 
 // Criar usuário
 const criarUsuario = async (req, res) => {
     try {
         const usuario = req.body
 
-        // Verifica se email, CPF ou username já existem
+        // Verifica se email, CPF ou username já existem.
         const usuarioExiste = await usuarioModel.ValidarUser(usuario)
 
         if (usuarioExiste) {
-            return res.status(409).json({
+            return res.status(config_message.DADOS_USUARIO_EXISTENTES.status).json({
                 sucesso: false,
-                mensagem: 'Email, CPF ou username já cadastrado.'
+                mensagem: config_message.DADOS_USUARIO_EXISTENTES.mensagem
             })
         }
 
         const id_usuario = await usuarioModel.CreateUsers(usuario)
 
         if (!id_usuario) {
-            return res.status(500).json({
+            return res.status(config_message.ERRO_CRIAR_USUARIO.status).json({
                 sucesso: false,
-                mensagem: 'Erro ao criar usuário.'
+                mensagem: config_message.ERRO_CRIAR_USUARIO.mensagem
             })
         }
 
-        return res.status(201).json({
+        return res.status(config_message.USUARIO_CRIADO.status).json({
             sucesso: true,
-            mensagem: 'Usuário criado com sucesso.',
-            id_usuario: id_usuario
+            mensagem: config_message.USUARIO_CRIADO.mensagem,
+            id_usuario
         })
     } catch (error) {
         console.error('Erro ao criar usuário:', error)
 
-        return res.status(500).json({
+        return res.status(config_message.ERRO_INTERNO.status).json({
             sucesso: false,
-            mensagem: 'Erro interno do servidor.'
+            mensagem: config_message.ERRO_INTERNO.mensagem
         })
     }
 }
@@ -53,16 +48,16 @@ const atualizarUsuario = async (req, res) => {
         const id_usuario = Number(req.params.id_usuario)
 
         if (!Number.isInteger(id_usuario) || id_usuario <= 0) {
-            return res.status(400).json({
+            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
                 sucesso: false,
-                mensagem: 'ID do usuário inválido.'
+                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
             })
         }
 
         if (!req.body || Object.keys(req.body).length === 0) {
-            return res.status(400).json({
+            return res.status(config_message.NENHUM_CAMPO_ATUALIZAR.status).json({
                 sucesso: false,
-                mensagem: 'Informe ao menos um campo para atualizar.'
+                mensagem: config_message.NENHUM_CAMPO_ATUALIZAR.mensagem
             })
         }
 
@@ -74,22 +69,22 @@ const atualizarUsuario = async (req, res) => {
         const usuarioAtualizado = await usuarioModel.UpdateUsers(usuario)
 
         if (!usuarioAtualizado) {
-            return res.status(404).json({
+            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
                 sucesso: false,
-                mensagem: 'Usuário não encontrado ou nenhum dado alterado.'
+                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
             })
         }
 
-        return res.status(200).json({
+        return res.status(config_message.USUARIO_ATUALIZADO.status).json({
             sucesso: true,
-            mensagem: 'Usuário atualizado com sucesso.'
+            mensagem: config_message.USUARIO_ATUALIZADO.mensagem
         })
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error)
 
-        return res.status(500).json({
+        return res.status(config_message.ERRO_ATUALIZAR_USUARIO.status).json({
             sucesso: false,
-            mensagem: 'Erro interno do servidor.'
+            mensagem: config_message.ERRO_ATUALIZAR_USUARIO.mensagem
         })
     }
 }
@@ -97,27 +92,34 @@ const atualizarUsuario = async (req, res) => {
 // Deletar usuário
 const deletarUsuario = async (req, res) => {
     try {
-        const { id_usuario } = req.params
+        const id_usuario = Number(req.params.id_usuario)
+
+        if (!Number.isInteger(id_usuario) || id_usuario <= 0) {
+            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
+                sucesso: false,
+                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
+            })
+        }
 
         const usuarioDeletado = await usuarioModel.DeleteUsers(id_usuario)
 
         if (!usuarioDeletado) {
-            return res.status(404).json({
+            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
                 sucesso: false,
-                mensagem: 'Usuário não encontrado ou ID inválido.'
+                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
             })
         }
 
-        return res.status(200).json({
+        return res.status(config_message.USUARIO_DELETADO.status).json({
             sucesso: true,
-            mensagem: 'Usuário deletado com sucesso.'
+            mensagem: config_message.USUARIO_DELETADO.mensagem
         })
     } catch (error) {
         console.error('Erro ao deletar usuário:', error)
 
-        return res.status(500).json({
+        return res.status(config_message.ERRO_DELETAR_USUARIO.status).json({
             sucesso: false,
-            mensagem: 'Erro interno do servidor.'
+            mensagem: config_message.ERRO_DELETAR_USUARIO.mensagem
         })
     }
 }
@@ -128,34 +130,35 @@ const buscarUsuarioPorUsername = async (req, res) => {
         const { username } = req.params
 
         if (!username) {
-            return res.status(400).json({
+            return res.status(config_message.USERNAME_OBRIGATORIO.status).json({
                 sucesso: false,
-                mensagem: 'Username não informado.'
+                mensagem: config_message.USERNAME_OBRIGATORIO.mensagem
             })
         }
 
         const usuario = await usuarioModel.GetUsuarioByUsername(username)
 
         if (!usuario) {
-            return res.status(404).json({
+            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
                 sucesso: false,
-                mensagem: 'Usuário não encontrado.'
+                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
             })
         }
 
-        // Não retornar a senha na resposta
+        // Não retorna a senha na resposta.
         const { senha, ...usuarioSemSenha } = usuario
 
-        return res.status(200).json({
+        return res.status(config_message.USUARIO_ENCONTRADO.status).json({
             sucesso: true,
+            mensagem: config_message.USUARIO_ENCONTRADO.mensagem,
             usuario: usuarioSemSenha
         })
     } catch (error) {
         console.error('Erro ao buscar usuário:', error)
 
-        return res.status(500).json({
+        return res.status(config_message.ERRO_BUSCAR_USUARIO.status).json({
             sucesso: false,
-            mensagem: 'Erro interno do servidor.'
+            mensagem: config_message.ERRO_BUSCAR_USUARIO.mensagem
         })
     }
 }
@@ -165,20 +168,21 @@ const buscarTodosUsuarios = async (req, res) => {
     try {
         const usuarios = await usuarioModel.GetAllUsers()
 
-        // Não retornar as senhas dos usuários
+        // Não retorna as senhas dos usuários.
         const usuariosSemSenha = usuarios.map(({ senha, ...usuario }) => usuario)
 
-        return res.status(200).json({
+        return res.status(config_message.USUARIOS_ENCONTRADOS.status).json({
             sucesso: true,
+            mensagem: config_message.USUARIOS_ENCONTRADOS.mensagem,
             quantidade: usuariosSemSenha.length,
             usuarios: usuariosSemSenha
         })
     } catch (error) {
         console.error('Erro ao buscar usuários:', error)
 
-        return res.status(500).json({
+        return res.status(config_message.ERRO_BUSCAR_USUARIOS.status).json({
             sucesso: false,
-            mensagem: 'Erro interno do servidor.'
+            mensagem: config_message.ERRO_BUSCAR_USUARIOS.mensagem
         })
     }
 }
