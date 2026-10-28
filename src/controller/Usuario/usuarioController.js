@@ -1,14 +1,15 @@
-const config_message = require('../modulo/configMensagens.js')
 
-// Importa o DAO responsável pelo acesso ao banco de dados.
+const config_message = require('../modulo/configMensagens.js')
+const crypto = require('crypto')
+const codigoOTPModel = require('../../../model/DAO/condigo_OTP/codigo_otp_DAO.js')
 const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
+const { enviarOTP } = require('../../config/email.js')
 
 // Criar usuário
 const criarUsuario = async (req, res) => {
     try {
         const usuario = req.body
 
-        // Verifica se email, CPF ou username já existem.
         const usuarioExiste = await usuarioModel.ValidarUser(usuario)
 
         if (usuarioExiste) {
@@ -27,17 +28,37 @@ const criarUsuario = async (req, res) => {
             })
         }
 
-        return res.status(config_message.USUARIO_CRIADO.status).json({
+        // Gera OTP de 6 dígitos, válido por 5 minutos
+        const codigo = crypto.randomInt(100000, 1000000).toString()
+
+        const otpCriado = await codigoOTPModel.CreateCodigoOTP({
+            codigo,
+            ativo: true,
+            data_expiracao: new Date(Date.now() + 5 * 60 * 1000),
+            id_usuario
+        })
+
+        if (!otpCriado) {
+            return res.status(500).json({
+                sucesso: false,
+                mensagem: 'Usuário criado, mas ocorreu um erro ao gerar o OTP.'
+            })
+        }
+
+        // Envia o código para o e-mail informado no cadastro
+        await enviarOTP(usuario.email, codigo)
+
+        return res.status(201).json({
             sucesso: true,
-            mensagem: config_message.USUARIO_CRIADO.mensagem,
+            mensagem: 'Usuário criado. Verifique seu e-mail para obter o código OTP.',
             id_usuario
         })
     } catch (error) {
-        console.error('Erro ao criar usuário:', error)
+        console.error('Erro ao criar usuário ou enviar OTP:', error)
 
-        return res.status(config_message.ERRO_INTERNO.status).json({
+        return res.status(500).json({
             sucesso: false,
-            mensagem: config_message.ERRO_INTERNO.mensagem
+            mensagem: 'Ocorreu um erro ao criar o usuário ou enviar o código OTP.'
         })
     }
 }
@@ -46,6 +67,7 @@ const criarUsuario = async (req, res) => {
 const atualizarUsuario = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
+        const usuario = req.body
 
         if (!Number.isInteger(id_usuario) || id_usuario <= 0) {
             return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
@@ -54,19 +76,7 @@ const atualizarUsuario = async (req, res) => {
             })
         }
 
-        if (!req.body || Object.keys(req.body).length === 0) {
-            return res.status(config_message.NENHUM_CAMPO_ATUALIZAR.status).json({
-                sucesso: false,
-                mensagem: config_message.NENHUM_CAMPO_ATUALIZAR.mensagem
-            })
-        }
-
-        const usuario = {
-            ...req.body,
-            id_usuario
-        }
-
-        const usuarioAtualizado = await usuarioModel.UpdateUsers(usuario)
+        const usuarioAtualizado = await usuarioModel.UpdateUsers(id_usuario, usuario)
 
         if (!usuarioAtualizado) {
             return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
@@ -75,16 +85,16 @@ const atualizarUsuario = async (req, res) => {
             })
         }
 
-        return res.status(config_message.USUARIO_ATUALIZADO.status).json({
+        return res.status(200).json({
             sucesso: true,
-            mensagem: config_message.USUARIO_ATUALIZADO.mensagem
+            mensagem: 'Usuário atualizado com sucesso.'
         })
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error)
 
-        return res.status(config_message.ERRO_ATUALIZAR_USUARIO.status).json({
+        return res.status(500).json({
             sucesso: false,
-            mensagem: config_message.ERRO_ATUALIZAR_USUARIO.mensagem
+            mensagem: 'Erro ao atualizar usuário.'
         })
     }
 }
@@ -145,7 +155,6 @@ const buscarUsuarioPorUsername = async (req, res) => {
             })
         }
 
-        // Não retorna a senha na resposta.
         const { senha, ...usuarioSemSenha } = usuario
 
         return res.status(config_message.USUARIO_ENCONTRADO.status).json({
@@ -168,7 +177,6 @@ const buscarTodosUsuarios = async (req, res) => {
     try {
         const usuarios = await usuarioModel.GetAllUsers()
 
-        // Não retorna as senhas dos usuários.
         const usuariosSemSenha = usuarios.map(({ senha, ...usuario }) => usuario)
 
         return res.status(config_message.USUARIOS_ENCONTRADOS.status).json({
