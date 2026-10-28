@@ -9,5 +9,12 @@
     "mysql": "^2.18.1",
     "mysql2": "^3.24.6",
     "pluggy-sdk": "^0.92.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  },
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   }
 }

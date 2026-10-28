@@ -1,0 +1,9 @@
+﻿{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "meu-chatbot-financeiro",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-21",
+  "ai": {
+    "binding": "AI"
+  }
+}

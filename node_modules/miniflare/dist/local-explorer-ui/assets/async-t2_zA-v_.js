@@ -1,0 +1,1 @@
+async function e(e,t=300){let[n]=await Promise.all([e,new Promise(e=>setTimeout(e,t))]);return n}export{e as t};
