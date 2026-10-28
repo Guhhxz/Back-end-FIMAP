@@ -38,3 +38,6 @@ const PORT = process.env.PORT || 8080
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`)
 })
+
+const redefinirSenhaController = require('./controller/Autenticacao/redefinirSenhaController.js')
+app.post('/v1/autenticacao/senha/recuperacao/redefinir', redefinirSenhaController.redefinirSenha)
