@@ -1,4 +1,4 @@
-// Importando as dependências
+﻿// Importando as dependências
 require("dotenv").config({
     path: require("path").resolve(__dirname, "../.env")
 })
@@ -6,46 +6,35 @@ require("dotenv").config({
 const express = require("express")
 const cors = require("cors")
 
-// Importando as rotas
+// Importando rotas e controller de mensagens
 const openFinanceRoutes = require("./routes/openFinanceRoutes")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
+const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 
-// Criando a aplicação
 const app = express()
 
-// Configurando o CORS
 const corsOption = {
     origin: "*",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }
 
-// Aplicando os middlewares
 app.use(cors(corsOption))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Rota inicial
 app.get("/", (req, res) => {
-    res.status(200).json({
-        mensagem: "API funcionando!",
-        status: "online"
-    })
+    res.status(200).json({ mensagem: "API funcionando!", status: "online" })
 })
 
+// Endpoints do Swagger para consultar e enviar mensagens de um chat
+app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
+app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
 
-// Rotas do Open Finance
 app.use("/v1/openfinance", openFinanceRoutes)
-
 app.use("/v1/openfinance/usuario", usuarioRoutes)
 
-
-
-
-
-// Inicializando o servidor
 const PORT = process.env.PORT || 8080
-
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`)
 })
