@@ -18,7 +18,7 @@ servers:
   description: Homologação (exemplo)
 tags:
 - name: Autenticação
-  description: Cadastro, login, tokens, dispositivos (tbl_dispositivo) e recuperação de senha (tbl_codigo_otp)
+  description: Cadastro, login, Kokens, dispositivos (tbl_dispositivo) e recuperação de senha (tbl_codigo_otp)
 - name: Perfil
   description: Perfil privado e perfil social (tbl_usuario)
 - name: Seguidores
@@ -311,12 +311,17 @@ paths:
               required:
               - token_redefinicao
               - nova_senha
+              - confirmar_nova_senha
               properties:
                 token_redefinicao:
                   type: string
                 nova_senha:
                   type: string
                   format: password
+                confirmar_nova_senha:
+                  type: string
+                  format: password
+                  description: Deve ser exatamente igual a nova_senha.
       responses:
         '200':
           description: Senha redefinida com sucesso
