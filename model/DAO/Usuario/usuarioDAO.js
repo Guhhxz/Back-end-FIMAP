@@ -8,6 +8,32 @@ const knexConfig = require('../../Database_config_knex/KnexFile.js')
 // Cria a conexão com o banco de dados utilizando as configurações do ambiente "development"
 const knexConex = knex(knexConfig.development)
 
+// Buscar usuário por id
+const GetUsuarioById = async (id_usuario) => {
+    let sql = `select * from tbl_usuario where id = ?`
+
+    try {
+        let result = await knexConex.raw(sql, [id_usuario])
+        return result ? result[0][0] || null : null
+    } catch (error) {
+        console.error('Erro ao buscar usuário por id:', error)
+        return null
+    }
+}
+
+// Buscar usuário por e-mail
+const GetUsuarioByEmail = async (email) => {
+    let sql = `select * from tbl_usuario where email = ?`
+
+    try {
+        let result = await knexConex.raw(sql, [email])
+        return result ? result[0][0] || null : null
+    } catch (error) {
+        console.error('Erro ao buscar usuário por email:', error)
+        return null
+    }
+}
+
 // Criar usuário
 const CreateUsers = async (usuario) => {
     let sql = `insert into tbl_usuario
@@ -37,7 +63,6 @@ const CreateUsers = async (usuario) => {
         ])
 
         if (result) return result[0].insertId
-
     } catch (error) {
         console.error('Erro ao criar usuário:', error)
         return false
@@ -46,8 +71,6 @@ const CreateUsers = async (usuario) => {
 
 // Atualizar usuário
 const UpdateUsers = async (usuario) => {
-
-    
     let sqlSenha = `update tbl_usuario
     set senha = ?
     where id = ?`
@@ -57,10 +80,7 @@ const UpdateUsers = async (usuario) => {
         if (usuario.senha !== undefined) {
             const senhaHash = await bcrypt.hash(usuario.senha, 10)
 
-            let resultSenha = await knexConex.raw(sqlSenha, [
-                senhaHash,
-                usuario.id_usuario
-            ])
+            let resultSenha = await knexConex.raw(sqlSenha, [senhaHash, usuario.id_usuario])
 
             if (resultSenha[0].affectedRows === 0) {
                 return false
@@ -106,7 +126,6 @@ const UpdateUsers = async (usuario) => {
         let result = await knexConex.raw(sql, valores)
 
         if (result) return result[0].affectedRows > 0
-
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error)
         return false
@@ -122,7 +141,6 @@ const DeleteUsers = async (id_usuario) => {
         let result = await knexConex.raw(sql, [id_usuario])
 
         if (result) return result[0].affectedRows > 0
-
     } catch (error) {
         console.error('Erro ao deletar usuário:', error)
         return false
@@ -138,7 +156,6 @@ const GetUsuarioByUsername = async (username) => {
         let result = await knexConex.raw(sql, [username])
 
         if (result) return result[0][0] || null
-
     } catch (error) {
         console.error('Erro ao buscar usuário por username:', error)
         return false
@@ -156,7 +173,6 @@ const GetAllUsers = async () => {
         let result = await knexConex.raw(sql)
 
         if (result) return result[0]
-
     } catch (error) {
         console.error('Erro ao buscar todos os usuários:', error)
         return false
@@ -174,7 +190,7 @@ const ValidarUser = async (usuario) => {
             valores.push(usuario.email)
         }
 
-        if  (usuario.cpf) {
+        if (usuario.cpf) {
             condicoes.push('cpf = ?')
             valores.push(usuario.cpf)
         }
@@ -194,7 +210,6 @@ const ValidarUser = async (usuario) => {
         let result = await knexConex.raw(sql, valores)
 
         if (result) return result[0].length > 0
-
     } catch (error) {
         console.error('Erro ao validar usuário:', error)
         return false
@@ -212,6 +227,8 @@ const ValidarSenha = async (senhaDigitada, senhaHash) => {
 }
 
 module.exports = {
+    GetUsuarioById,
+    GetUsuarioByEmail,
     CreateUsers,
     UpdateUsers,
     DeleteUsers,

@@ -5,24 +5,22 @@ async function gerarConnectToken(req, res) {
     try {
         const { clientUserId } = req.body
 
-        if (!clientUserId || typeof clientUserId !== "string") {
+        if (!clientUserId || typeof clientUserId !== 'string') {
             return res.status(400).json({
-                erro: "Informe um clientUserId válido."
+                erro: 'Informe um clientUserId válido.'
             })
         }
 
-        const accessToken = await pluggyService.criarConnectToken(
-            clientUserId
-        )
+        const accessToken = await pluggyService.criarConnectToken(clientUserId)
 
         return res.status(200).json({
             accessToken
         })
     } catch (error) {
-        console.error("Erro ao gerar Connect Token:", error.message)
+        console.error('Erro ao gerar Connect Token:', error.message)
 
         return res.status(500).json({
-            erro: "Não foi possível gerar o Connect Token."
+            erro: 'Não foi possível gerar o Connect Token.'
         })
     }
 }
@@ -32,21 +30,21 @@ async function obterSaldo(req, res) {
         const { itemId } = req.params
 
         if (!itemId) {
-            return res.status(400).json({ erro: "Informe o itemId." })
+            return res.status(400).json({ erro: 'Informe o itemId.' })
         }
 
         const resultado = await pluggyService.buscarSaldo(itemId)
 
         if (resultado.atualizando) {
             return res.status(202).json({
-                mensagem: "Conexão ainda sincronizando. Tente novamente em alguns segundos."
+                mensagem: 'Conexão ainda sincronizando. Tente novamente em alguns segundos.'
             })
         }
 
         return res.status(200).json(resultado)
     } catch (error) {
-        console.error("Erro ao buscar saldo:", error)
-        return res.status(500).json({ erro: "Não foi possível buscar o saldo." })
+        console.error('Erro ao buscar saldo:', error)
+        return res.status(500).json({ erro: 'Não foi possível buscar o saldo.' })
     }
 }
 
