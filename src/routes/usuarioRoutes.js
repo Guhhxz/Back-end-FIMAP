@@ -1,13 +1,10 @@
-
 const express = require("express")
 const router = express.Router()
 
 const usuarioController = require("../controller/Usuario/usuarioController.js")
 
-// Cadastro e verificação por e-mail
-router.post("/criar-usuario", usuarioController.criarUsuario)
-router.post("/solicitar-otp", usuarioController.solicitarOTP)
-router.post("/verificar-otp", usuarioController.verificarOTP)
+// Cadastro: valida, cria o usuário, gera e envia o OTP (apaga a conta se falhar)
+router.post("/criar-usuario", usuarioController.criarCodigoOTPUsuario)
 
 // Atualizar usuário
 router.patch("/usuario-update/:id_usuario", usuarioController.atualizarUsuario)

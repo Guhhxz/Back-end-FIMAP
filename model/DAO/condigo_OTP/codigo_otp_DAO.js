@@ -1,17 +1,15 @@
-
 const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
-// Salva o OTP e os dados temporários do cadastro
+// Salva o OTP vinculado ao usuário (colunas reais da tbl_codigo_otp)
 const CreateCodigoOTP = async (dados) => {
     try {
         const [id] = await knexConex('tbl_codigo_otp').insert({
-            email: dados.email,
             codigo: dados.codigo,
-            dados_usuario: JSON.stringify(dados.dados_usuario),
             ativo: true,
-            data_expiracao: dados.data_expiracao
+            data_expiracao: dados.data_expiracao,
+            id_usuario: dados.id_usuario
         })
 
         return id
@@ -21,12 +19,12 @@ const CreateCodigoOTP = async (dados) => {
     }
 }
 
-// Busca um OTP válido para o e-mail informado
-const GetCodigoOTPValido = async (email, codigo) => {
+// Busca um OTP ativo e não expirado do usuário com o código informado
+const GetCodigoOTPValido = async (id_usuario, codigo) => {
     try {
         return await knexConex('tbl_codigo_otp')
             .where({
-                email,
+                id_usuario,
                 codigo,
                 ativo: true
             })
@@ -38,11 +36,11 @@ const GetCodigoOTPValido = async (email, codigo) => {
     }
 }
 
-// Desativa o OTP após a utilização
-const DesativarCodigoOTP = async (id_codigo_otp) => {
+// Desativa o OTP após a utilização (a chave da tabela é "id")
+const DesativarCodigoOTP = async (id) => {
     try {
         const quantidade = await knexConex('tbl_codigo_otp')
-            .where({ id_codigo_otp })
+            .where({ id })
             .update({ ativo: false })
 
         return quantidade > 0
