@@ -1,4 +1,4 @@
-﻿const knex = require('knex')
+const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 
 const db = knex(knexConfig.development)
@@ -21,10 +21,8 @@ const formatarMensagem = (mensagem) => ({
     data_envio: mensagem.data_envio
 })
 
-const buscarChat = async (chatId) => db('tbl_chat')
-    .select('id', 'nome', 'id_usuario')
-    .where({ id: chatId })
-    .first()
+const buscarChat = async (chatId) =>
+    db('tbl_chat').select('id', 'nome', 'id_usuario').where({ id: chatId }).first()
 
 const listarMensagensChat = async (chatId, { antesDe, limite = 30 } = {}) => {
     const chat = await buscarChat(chatId)
@@ -49,15 +47,19 @@ const listarMensagensChat = async (chatId, { antesDe, limite = 30 } = {}) => {
 
 const extrairTrechoCloudflare = (dados) => {
     if (typeof dados === 'string') return dados
-    return dados?.response ||
+    return (
+        dados?.response ||
         dados?.choices?.[0]?.delta?.content ||
-        dados?.choices?.[0]?.message?.content || ''
+        dados?.choices?.[0]?.message?.content ||
+        ''
+    )
 }
 
 const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceberTrecho) => {
     const workerUrl = process.env.CLOUDFLARE_WORKER_URL || 'http://127.0.0.1:8787/chat'
     const token = process.env.CLOUDFLARE_CHAT_TOKEN
-    if (!token) throw erro(503, 'Configure CLOUDFLARE_CHAT_TOKEN no .env.', 'CLOUDFLARE_NOT_CONFIGURED')
+    if (!token)
+        throw erro(503, 'Configure CLOUDFLARE_CHAT_TOKEN no .env.', 'CLOUDFLARE_NOT_CONFIGURED')
 
     const historico = await db('tbl_mensagem')
         .select('papel', 'conteudo')
@@ -66,14 +68,19 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
         .orderBy('id', 'desc')
         .limit(1)
 
-    const mensagens = [{
-        role: 'system',
-        content: 'Você é uma assistente financeira pessoal, acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não ofereça ajuda com programação, a menos que a pessoa peça explicitamente. Não invente dados; pergunte quando faltarem informações.'
-    }]
-    mensagens.push(...historico.reverse().map((mensagem) => ({
-        role: Number(mensagem.papel) === PAPEL_USUARIO ? 'user' : 'assistant',
-        content: mensagem.conteudo
-    })))
+    const mensagens = [
+        {
+            role: 'system',
+            content:
+                'Você é uma assistente financeira pessoal, acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não ofereça ajuda com programação, a menos que a pessoa peça explicitamente. Não invente dados; pergunte quando faltarem informações.'
+        }
+    ]
+    mensagens.push(
+        ...historico.reverse().map((mensagem) => ({
+            role: Number(mensagem.papel) === PAPEL_USUARIO ? 'user' : 'assistant',
+            content: mensagem.conteudo
+        }))
+    )
     mensagens.push({ role: 'user', content: conteudo })
 
     let response
@@ -91,18 +98,29 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
         if (cause.name === 'TimeoutError' || cause.name === 'AbortError') {
             throw erro(503, 'A Cloudflare excedeu o tempo limite.', 'CLOUDFLARE_TIMEOUT')
         }
-        throw erro(503, 'Não foi possível conectar ao Worker da Cloudflare.', 'CLOUDFLARE_UNAVAILABLE')
+        throw erro(
+            503,
+            'Não foi possível conectar ao Worker da Cloudflare.',
+            'CLOUDFLARE_UNAVAILABLE'
+        )
     }
 
     if (!response.ok) {
         const corpoErro = await response.text().catch(() => '')
         let mensagemErro = `O Worker da Cloudflare respondeu com status ${response.status}.`
-        try { mensagemErro = JSON.parse(corpoErro).error || mensagemErro } catch {}
+        try {
+            mensagemErro = JSON.parse(corpoErro).error || mensagemErro
+        } catch {}
         if (response.status === 401) throw erro(503, mensagemErro, 'CLOUDFLARE_AUTH_ERROR')
         if (response.status === 404) throw erro(503, mensagemErro, 'CLOUDFLARE_URL_ERROR')
         throw erro(502, mensagemErro, 'CLOUDFLARE_PROVIDER_ERROR')
     }
-    if (!response.body) throw erro(502, 'A Cloudflare não retornou um fluxo de resposta.', 'CLOUDFLARE_INVALID_RESPONSE')
+    if (!response.body)
+        throw erro(
+            502,
+            'A Cloudflare não retornou um fluxo de resposta.',
+            'CLOUDFLARE_INVALID_RESPONSE'
+        )
 
     let respostaCompleta = ''
     const reader = response.body.getReader()
@@ -116,13 +134,18 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
             buffer = eventos.pop() || ''
 
             for (const evento of eventos) {
-                const dadosEvento = evento.split(/\r?\n/)
+                const dadosEvento = evento
+                    .split(/\r?\n/)
                     .filter((linha) => linha.startsWith('data:'))
                     .map((linha) => linha.slice(5).trim())
                     .join('\n')
                 if (!dadosEvento || dadosEvento === '[DONE]') continue
                 let dados
-                try { dados = JSON.parse(dadosEvento) } catch { dados = dadosEvento }
+                try {
+                    dados = JSON.parse(dadosEvento)
+                } catch {
+                    dados = dadosEvento
+                }
                 const trecho = extrairTrechoCloudflare(dados)
                 if (trecho) {
                     respostaCompleta += trecho
@@ -132,24 +155,37 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
             if (done) break
         }
         if (buffer.trim()) {
-            const dadosEvento = buffer.split(/\r?\n/)
+            const dadosEvento = buffer
+                .split(/\r?\n/)
                 .filter((linha) => linha.startsWith('data:'))
                 .map((linha) => linha.slice(5).trim())
                 .join('\n')
             if (dadosEvento && dadosEvento !== '[DONE]') {
                 let dados
-                try { dados = JSON.parse(dadosEvento) } catch { dados = dadosEvento }
+                try {
+                    dados = JSON.parse(dadosEvento)
+                } catch {
+                    dados = dadosEvento
+                }
                 const trecho = extrairTrechoCloudflare(dados)
-                if (trecho) { respostaCompleta += trecho; aoReceberTrecho(trecho) }
+                if (trecho) {
+                    respostaCompleta += trecho
+                    aoReceberTrecho(trecho)
+                }
             }
         }
     } catch (cause) {
         if (cause.code) throw cause
-        throw erro(502, 'O fluxo de resposta da Cloudflare era inválido.', 'CLOUDFLARE_INVALID_RESPONSE')
+        throw erro(
+            502,
+            'O fluxo de resposta da Cloudflare era inválido.',
+            'CLOUDFLARE_INVALID_RESPONSE'
+        )
     }
 
     respostaCompleta = respostaCompleta.trim()
-    if (!respostaCompleta) throw erro(502, 'A Cloudflare retornou uma resposta vazia.', 'CLOUDFLARE_INVALID_RESPONSE')
+    if (!respostaCompleta)
+        throw erro(502, 'A Cloudflare retornou uma resposta vazia.', 'CLOUDFLARE_INVALID_RESPONSE')
 
     const [idAssistente] = await db('tbl_mensagem').insert({
         conteudo: respostaCompleta,
@@ -179,7 +215,12 @@ const iniciarMensagemChat = async (chatId, conteudo, aoReceberTrecho) => {
         .where({ id: idUsuario })
         .first()
     const mensagemUsuario = formatarMensagem(linhaUsuario)
-    const mensagemAssistente = await transmitirRespostaAssistente(chatId, conteudo, idUsuario, aoReceberTrecho)
+    const mensagemAssistente = await transmitirRespostaAssistente(
+        chatId,
+        conteudo,
+        idUsuario,
+        aoReceberTrecho
+    )
     return { mensagem_usuario: mensagemUsuario, mensagem_assistente: mensagemAssistente }
 }
 

@@ -31,9 +31,6 @@ app.get("/", (req, res) => {
 app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
 app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
 
-app.use("/v1/openfinance", openFinanceRoutes)
-app.use("/v1/openfinance/usuario", usuarioRoutes)
-
 const PORT = process.env.PORT || 8080
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`)
