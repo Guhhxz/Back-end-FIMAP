@@ -1,0 +1,5 @@
+const knex = require('knex')
+const bcrypt = require('bcrypt')
+const crypto = require('crypto')
+const knexConfig = require('../../../model/Database_config_knex/KnexFile.js')
+const knexConex = knex(knexConfig.development)

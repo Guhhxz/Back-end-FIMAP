@@ -1,103 +1,349 @@
 const config_message = require('../modulo/configMensagens.js')
-const dispositivoModel = require('../../../model/DAO/Dispositivos/dispositivos.js')
+const crypto = require('crypto')
+const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
+const { enviarOTP } = require('../../config/email.js')
 
-const criarDispositivo = async (req, res) => {
+const OTP_VALIDADE_MS = 5 * 60 * 1000
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Segredo usado para assinar a "chave" enviada ao cliente (defina OTP_SECRET no .env)
+const OTP_SECRET = process.env.OTP_SECRET
+
+if (!OTP_SECRET) {
+    console.warn('ATENÇÃO: defina OTP_SECRET no .env, senão o cadastro com OTP não funciona.')
+}
+
+// Gera OTP de 6 dígitos
+const gerarCodigo = () => crypto.randomInt(100000, 1000000).toString()
+
+// Assinatura que depende do código: só quem tem o código certo reproduz a assinatura
+const assinar = (payload, codigo) =>
+    crypto.createHmac('sha256', OTP_SECRET).update(`${payload}:${codigo}`).digest('base64url')
+
+// Gera a chave (token) devolvida ao cliente: dados do e-mail + validade + assinatura
+const gerarChave = (email, codigo) => {
+    const payload = Buffer.from(JSON.stringify({
+        email: email.toLowerCase(),
+        exp: Date.now() + OTP_VALIDADE_MS
+    })).toString('base64url')
+
+    return `${payload}.${assinar(payload, codigo)}`
+}
+
+// Confere chave + código + e-mail. Retorna { ok: true } ou { ok: false, motivo }
+const validarChave = (chave, codigo, email) => {
     try {
-        // Tudo vem do front
-        const { nome, sistema_operacional, identificador, id_usuario } = req.body
+        const [payload, assinatura] = String(chave).split('.')
 
-        if (!nome || !sistema_operacional || !identificador || !id_usuario) {
-            return res.status(400).json({
+        if (!payload || !assinatura) {
+            return { ok: false, motivo: 'invalido' }
+        }
+
+        const esperada = Buffer.from(assinar(payload, String(codigo)))
+        const recebida = Buffer.from(assinatura)
+
+        if (esperada.length !== recebida.length || !crypto.timingSafeEqual(esperada, recebida)) {
+            return { ok: false, motivo: 'invalido' }
+        }
+
+        const dados = JSON.parse(Buffer.from(payload, 'base64url').toString())
+
+        if (Date.now() > dados.exp) {
+            return { ok: false, motivo: 'expirado' }
+        }
+
+        if (dados.email !== String(email).toLowerCase()) {
+            return { ok: false, motivo: 'invalido' }
+        }
+
+        return { ok: true }
+    } catch (error) {
+        return { ok: false, motivo: 'invalido' }
+    }
+}
+
+// ETAPA 1: cria o código, envia por e-mail e devolve a chave. Body: { email }
+const criarCodigoOTP = async (req, res) => {
+    try {
+        const { email } = req.body
+
+        if (!email) {
+            return res.status(config_message.EMAIL_OBRIGATORIO.status).json({
                 sucesso: false,
-                mensagem: 'Nome, sistema operacional, identificador e id_usuario são obrigatórios.'
+                mensagem: config_message.EMAIL_OBRIGATORIO.mensagem
             })
         }
 
-        if (!Number.isInteger(Number(id_usuario))) {
-            return res.status(400).json({
+        if (!EMAIL_REGEX.test(email)) {
+            return res.status(config_message.EMAIL_INVALIDO.status).json({
                 sucesso: false,
-                mensagem: 'id_usuario inválido.'
+                mensagem: config_message.EMAIL_INVALIDO.mensagem
             })
         }
 
-        // Objeto que será repassado ao DAO
-        const dispositivo = {
-            nome: String(nome).substring(0, 67),
-            sistema_operacional: String(sistema_operacional).substring(0, 24),
-            identificador: String(identificador).substring(0, 64),
-            id_usuario: Number(id_usuario)
-        }
-
-        // Usuário precisa existir (evita erro de chave estrangeira)
-        const usuarioExiste = await dispositivoModel.ExisteUsuario(dispositivo.id_usuario)
-        if (!usuarioExiste) {
-            return res.status(404).json({
+        if (!OTP_SECRET) {
+            return res.status(config_message.ERRO_GERAR_OTP.status).json({
                 sucesso: false,
-                mensagem: 'Usuário não encontrado.'
+                mensagem: config_message.ERRO_GERAR_OTP.mensagem
             })
         }
 
-        // Não duplica o mesmo dispositivo para o mesmo usuário
-        const existe = await dispositivoModel.ValidarDispositivo(dispositivo)
-        if (existe) {
-            return res.status(200).json({
-                sucesso: true,
-                mensagem: 'Dispositivo já cadastrado.'
-            })
-        }
+        const codigo = gerarCodigo()
+        const chave = gerarChave(email, codigo)
 
-        // Repassa para o DAO, que devolve o insertId (ou false)
-        const idDispositivo = await dispositivoModel.CreateDispositivo(dispositivo)
+        try {
+            await enviarOTP(email, codigo)
+        } catch (erroEmail) {
+            console.error('Erro ao enviar OTP:', erroEmail)
 
-        if (!idDispositivo) {
-            return res.status(config_message.ERRO_CRIAR_DISPOSITIVO.status).json({
+            return res.status(config_message.ERRO_ENVIAR_OTP.status).json({
                 sucesso: false,
-                mensagem: config_message.ERRO_CRIAR_DISPOSITIVO.mensagem
+                mensagem: config_message.ERRO_ENVIAR_OTP.mensagem
             })
         }
 
-        return res.status(config_message.DISPOSITIVO_CRIADO.status).json({
+        return res.status(config_message.OTP_ENVIADO.status).json({
             sucesso: true,
-            mensagem: config_message.DISPOSITIVO_CRIADO.mensagem,
-            id_dispositivo: idDispositivo
+            mensagem: config_message.OTP_ENVIADO.mensagem,
+            chave
         })
     } catch (error) {
-        console.error('Erro ao criar dispositivo:', error)
+        console.error('Erro ao criar código OTP:', error)
 
-        return res.status(config_message.ERRO_INTERNO.status).json({
+        return res.status(config_message.ERRO_GERAR_OTP.status).json({
             sucesso: false,
-            mensagem: config_message.ERRO_INTERNO.mensagem
+            mensagem: config_message.ERRO_GERAR_OTP.mensagem
         })
     }
 }
 
-const ListarTodosDispositivos = async (req, res) => {
+// ETAPA 2: só cria o usuário se o código e a chave estiverem corretos.
+// Body: { ...dados do usuário, codigo, chave }
+const criarUsuario = async (req, res) => {
     try {
-        const dispositivos = await dispositivoModel.GetAllDispositivos()
+        const { codigo, chave, ...dados } = req.body
 
-        if (dispositivos === false) {
-            return res.status(config_message.ERRO_LISTAR_DISPOSITIVOS.status).json({
+        if (!codigo || !chave) {
+            return res.status(config_message.CODIGO_OTP_OBRIGATORIO.status).json({
                 sucesso: false,
-                mensagem: config_message.ERRO_LISTAR_DISPOSITIVOS.mensagem
+                mensagem: config_message.CODIGO_OTP_OBRIGATORIO.mensagem
             })
         }
 
-        return res.status(config_message.DISPOSITIVOS_LISTADOS.status).json({
+        if (!dados.nome || !dados.cpf || !dados.email || !dados.username || !dados.senha) {
+            return res.status(config_message.CAMPOS_OBRIGATORIOS.status).json({
+                sucesso: false,
+                mensagem: config_message.CAMPOS_OBRIGATORIOS.mensagem
+            })
+        }
+
+        if (!OTP_SECRET) {
+            return res.status(config_message.ERRO_VALIDAR_OTP.status).json({
+                sucesso: false,
+                mensagem: config_message.ERRO_VALIDAR_OTP.mensagem
+            })
+        }
+
+        const validacao = validarChave(chave, codigo, dados.email)
+
+        if (!validacao.ok) {
+            const erro = validacao.motivo === 'expirado'
+                ? config_message.CODIGO_OTP_EXPIRADO
+                : config_message.CODIGO_OTP_INCORRETO
+
+            return res.status(erro.status).json({
+                sucesso: false,
+                mensagem: erro.mensagem
+            })
+        }
+
+        // só os campos permitidos; XP e nível não podem vir do cliente
+        const usuario = {
+            nome: dados.nome,
+            cpf: dados.cpf,
+            email: dados.email,
+            username: dados.username,
+            senha: dados.senha,
+            xp_usuario: 0,
+            nivel_total: 1,
+            foto_perfil: dados.foto_perfil ?? null,
+            nome_exibicao: dados.nome_exibicao ?? null,
+            username_social: dados.username_social ?? null,
+            biografia_social: dados.biografia_social ?? null,
+            localizacao_estado: dados.localizacao_estado ?? null,
+            visibilidade: dados.visibilidade ?? 1
+        }
+
+        const usuarioExiste = await usuarioModel.ValidarUser(usuario)
+
+        if (usuarioExiste) {
+            return res.status(config_message.DADOS_USUARIO_EXISTENTES.status).json({
+                sucesso: false,
+                mensagem: config_message.DADOS_USUARIO_EXISTENTES.mensagem
+            })
+        }
+
+        const id_usuario = await usuarioModel.CreateUsers(usuario)
+
+        if (!id_usuario) {
+            return res.status(config_message.ERRO_CRIAR_USUARIO.status).json({
+                sucesso: false,
+                mensagem: config_message.ERRO_CRIAR_USUARIO.mensagem
+            })
+        }
+
+        return res.status(config_message.USUARIO_CRIADO.status).json({
             sucesso: true,
-            mensagem: config_message.DISPOSITIVOS_LISTADOS.mensagem,
-            dispositivos
+            mensagem: config_message.USUARIO_CRIADO.mensagem,
+            id_usuario
         })
     } catch (error) {
-        console.error('Erro ao listar dispositivos:', error)
+        console.error('Erro ao criar usuário:', error)
 
-        return res.status(config_message.ERRO_INTERNO.status).json({
+        return res.status(config_message.ERRO_CRIAR_USUARIO.status).json({
             sucesso: false,
-            mensagem: config_message.ERRO_INTERNO.mensagem
+            mensagem: config_message.ERRO_CRIAR_USUARIO.mensagem
+        })
+    }
+}
+
+// Atualizar usuário
+const atualizarUsuario = async (req, res) => {
+    try {
+        const id_usuario = Number(req.params.id_usuario)
+        const usuario = req.body
+
+        if (!Number.isInteger(id_usuario) || id_usuario <= 0) {
+            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
+                sucesso: false,
+                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
+            })
+        }
+
+        const usuarioAtualizado = await usuarioModel.UpdateUsers({ ...usuario, id_usuario })
+
+        if (!usuarioAtualizado) {
+            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
+                sucesso: false,
+                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
+            })
+        }
+
+        return res.status(config_message.USUARIO_ATUALIZADO.status).json({
+            sucesso: true,
+            mensagem: config_message.USUARIO_ATUALIZADO.mensagem
+        })
+    } catch (error) {
+        console.error('Erro ao atualizar usuário:', error)
+
+        return res.status(config_message.ERRO_ATUALIZAR_USUARIO.status).json({
+            sucesso: false,
+            mensagem: config_message.ERRO_ATUALIZAR_USUARIO.mensagem
+        })
+    }
+}
+
+// Deletar usuário
+const deletarUsuario = async (req, res) => {
+    try {
+        const id_usuario = Number(req.params.id_usuario)
+
+        if (!Number.isInteger(id_usuario) || id_usuario <= 0) {
+            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
+                sucesso: false,
+                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
+            })
+        }
+
+        const usuarioDeletado = await usuarioModel.DeleteUsers(id_usuario)
+
+        if (!usuarioDeletado) {
+            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
+                sucesso: false,
+                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
+            })
+        }
+
+        return res.status(config_message.USUARIO_DELETADO.status).json({
+            sucesso: true,
+            mensagem: config_message.USUARIO_DELETADO.mensagem
+        })
+    } catch (error) {
+        console.error('Erro ao deletar usuário:', error)
+
+        return res.status(config_message.ERRO_DELETAR_USUARIO.status).json({
+            sucesso: false,
+            mensagem: config_message.ERRO_DELETAR_USUARIO.mensagem
+        })
+    }
+}
+
+// Buscar usuário pelo username
+const buscarUsuarioPorUsername = async (req, res) => {
+    try {
+        const { username } = req.params
+
+        if (!username) {
+            return res.status(config_message.USERNAME_OBRIGATORIO.status).json({
+                sucesso: false,
+                mensagem: config_message.USERNAME_OBRIGATORIO.mensagem
+            })
+        }
+
+        const usuario = await usuarioModel.GetUsuarioByUsername(username)
+
+        if (!usuario) {
+            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
+                sucesso: false,
+                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
+            })
+        }
+
+        const { senha, ...usuarioSemSenha } = usuario
+
+        return res.status(config_message.USUARIO_ENCONTRADO.status).json({
+            sucesso: true,
+            mensagem: config_message.USUARIO_ENCONTRADO.mensagem,
+            usuario: usuarioSemSenha
+        })
+    } catch (error) {
+        console.error('Erro ao buscar usuário:', error)
+
+        return res.status(config_message.ERRO_BUSCAR_USUARIO.status).json({
+            sucesso: false,
+            mensagem: config_message.ERRO_BUSCAR_USUARIO.mensagem
+        })
+    }
+}
+
+// Buscar todos os usuários
+const buscarTodosUsuarios = async (req, res) => {
+    try {
+        const usuarios = await usuarioModel.GetAllUsers()
+
+        const usuariosSemSenha = usuarios.map(({ senha, ...usuario }) => usuario)
+
+        return res.status(config_message.USUARIOS_ENCONTRADOS.status).json({
+            sucesso: true,
+            mensagem: config_message.USUARIOS_ENCONTRADOS.mensagem,
+            quantidade: usuariosSemSenha.length,
+            usuarios: usuariosSemSenha
+        })
+    } catch (error) {
+        console.error('Erro ao buscar usuários:', error)
+
+        return res.status(config_message.ERRO_BUSCAR_USUARIOS.status).json({
+            sucesso: false,
+            mensagem: config_message.ERRO_BUSCAR_USUARIOS.mensagem
         })
     }
 }
 
 module.exports = {
-    criarDispositivo,
-    ListarTodosDispositivos
+    criarCodigoOTP,
+    criarUsuario,
+    atualizarUsuario,
+    deletarUsuario,
+    buscarUsuarioPorUsername,
+    buscarTodosUsuarios
 }

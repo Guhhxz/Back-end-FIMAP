@@ -86,9 +86,22 @@ const ValidarDispositivo = async (dispositivo) => {
     }
 }
 
+const DeletarDispositivo = async (id_dispositivo) => {
+    let sql = `delete from tbl_dispositivo where id = ?`   
+
+ try {
+        const [result] = await knexConex.raw(sql, [id_dispositivo])
+        return result.affectedRows > 0
+    } catch (error) {
+        console.error('Erro ao deletar dispositivo:', error)
+        return false
+    }
+}
+
 module.exports = {
     CreateDispositivo,
     GetAllDispositivos,
     ExisteUsuario,
-    ValidarDispositivo
+    ValidarDispositivo,
+    DeletarDispositivo
 }
