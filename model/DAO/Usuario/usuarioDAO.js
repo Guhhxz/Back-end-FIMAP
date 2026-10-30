@@ -212,13 +212,13 @@ const GetUsuarioByEmail = async (email) => {
 }
 
 module.exports = {
+    GetUsuarioById,
+    GetUsuarioByEmail,
     CreateUsers,
     UpdateUsers,
     DeleteUsers,
     GetUsuarioByUsername,
     GetAllUsers,
     ValidarUser,
-    ValidarSenha,
-    GetUsuarioById,
-    GetUsuarioByEmail
+    ValidarSenha
 }

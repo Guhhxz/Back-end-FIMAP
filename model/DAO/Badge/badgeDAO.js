@@ -1,4 +1,3 @@
-
 const knex = require('knex')
 
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
@@ -19,7 +18,6 @@ const CreateBadge = async (badge) => {
         ])
 
         return result.insertId
-
     } catch (error) {
         console.error('Erro ao criar badge:', error)
         return false
@@ -42,7 +40,6 @@ const UpdateBadge = async (badge) => {
         ])
 
         return result.affectedRows > 0
-
     } catch (error) {
         console.error('Erro ao atualizar badge:', error)
         return false
@@ -58,7 +55,6 @@ const DeleteBadge = async (badge) => {
         const [result] = await knexConex.raw(sql, [badge.id])
 
         return result.affectedRows > 0
-
     } catch (error) {
         console.error('Erro ao deletar badge:', error)
         return false
@@ -74,7 +70,6 @@ const GetBadgeByNome = async (nome) => {
         const [result] = await knexConex.raw(sql, [nome])
 
         return result[0] || null
-
     } catch (error) {
         console.error('Erro ao buscar badge por nome:', error)
         return null
@@ -84,15 +79,7 @@ const GetBadgeByNome = async (nome) => {
 // Buscar todas as badges
 const GetAllBadges = async () => {
     try {
-        return await knexConex('tbl_badge')
-            .select(
-                'id',
-                'icone',
-                'nome',
-                'descricao',
-                'xp'
-            )
-
+        return await knexConex('tbl_badge').select('id', 'icone', 'nome', 'descricao', 'xp')
     } catch (error) {
         console.error('Erro ao buscar todas as badges:', error)
         return false
@@ -121,7 +108,6 @@ const ValidarBadge = async (badge) => {
         const [result] = await knexConex.raw(sql, valores)
 
         return result.length > 0
-
     } catch (error) {
         console.error('Erro ao validar badge:', error)
         return false

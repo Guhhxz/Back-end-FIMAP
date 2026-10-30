@@ -453,7 +453,6 @@ const login = async (req, res) => {
         return responderErro(res, config_message.ERRO_LOGIN)
     }
 }
-
 module.exports = {
     criarCodigoOTPUsuario,
     verificarOTPCadastro,

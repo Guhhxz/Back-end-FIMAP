@@ -1,4 +1,4 @@
-﻿// Importando as dependências
+// Importando as dependências
 require("dotenv").config({
     path: require("path").resolve(__dirname, "../.env")
 })

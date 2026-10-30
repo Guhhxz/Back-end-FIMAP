@@ -716,7 +716,8 @@ const config_message = {
     },
     ERRO_REGISTRO_EM_USO: {
         status: 409,
-        mensagem: 'Não é possível excluir o registro pois ele está sendo utilizado por outros dados.'
+        mensagem:
+            'Não é possível excluir o registro pois ele está sendo utilizado por outros dados.'
     },
     ERRO_REGISTRO_DUPLICADO: {
         status: 409,
@@ -1975,71 +1976,71 @@ const config_message = {
         mensagem: 'Não foi possível adicionar XP ao usuário.'
     },
     // ==========================================
-// BADGES / CONQUISTAS - SUCESSO
-// ==========================================
-BADGE_CRIADA: {
-    status: 201,
-    mensagem: 'Badge criada com sucesso.'
-},
-BADGE_ENCONTRADA: {
-    status: 200,
-    mensagem: 'Badge encontrada com sucesso.'
-},
-BADGES_LISTADAS: {
-    status: 200,
-    mensagem: 'Badges listadas com sucesso.'
-},
-BADGE_ATUALIZADA: {
-    status: 200,
-    mensagem: 'Badge atualizada com sucesso.'
-},
-BADGE_EXCLUIDA: {
-    status: 200,
-    mensagem: 'Badge excluída com sucesso.'
-},
-BADGE_CONQUISTADA: {
-    status: 201,
-    mensagem: 'Badge conquistada pelo usuário com sucesso.'
-},
-BADGE_JA_CONQUISTADA: {
-    status: 200,
-    mensagem: 'O usuário já possui esta badge.'
-},
-BADGES_USUARIO_ENCONTRADAS: {
-    status: 200,
-    mensagem: 'Badges do usuário consultadas com sucesso.'
-},
-BADGES_USUARIO_LISTADAS: {
-    status: 200,
-    mensagem: 'Lista de badges do usuário retornada com sucesso.'
-},
-BADGE_VINCULADA_USUARIO: {
-    status: 201,
-    mensagem: 'Badge vinculada ao usuário com sucesso.'
-},
-BADGE_DESVINCULADA_USUARIO: {
-    status: 200,
-    mensagem: 'Badge desvinculada do usuário com sucesso.'
-},
-PROGRESSO_BADGE_ATUALIZADO: {
-    status: 200,
-    mensagem: 'Progresso da badge atualizado com sucesso.'
-},
-BADGES_ATUALIZADAS: {
-    status: 200,
-    mensagem: 'Badges atualizadas com sucesso.'
-},
-BADGE_VALIDADA: {
-    status: 200,
-    mensagem: 'Badge validada com sucesso.'
-},
+    // BADGES / CONQUISTAS - SUCESSO
+    // ==========================================
+    BADGE_CRIADA: {
+        status: 201,
+        mensagem: 'Badge criada com sucesso.'
+    },
+    BADGE_ENCONTRADA: {
+        status: 200,
+        mensagem: 'Badge encontrada com sucesso.'
+    },
+    BADGES_LISTADAS: {
+        status: 200,
+        mensagem: 'Badges listadas com sucesso.'
+    },
+    BADGE_ATUALIZADA: {
+        status: 200,
+        mensagem: 'Badge atualizada com sucesso.'
+    },
+    BADGE_EXCLUIDA: {
+        status: 200,
+        mensagem: 'Badge excluída com sucesso.'
+    },
+    BADGE_CONQUISTADA: {
+        status: 201,
+        mensagem: 'Badge conquistada pelo usuário com sucesso.'
+    },
+    BADGE_JA_CONQUISTADA: {
+        status: 200,
+        mensagem: 'O usuário já possui esta badge.'
+    },
+    BADGES_USUARIO_ENCONTRADAS: {
+        status: 200,
+        mensagem: 'Badges do usuário consultadas com sucesso.'
+    },
+    BADGES_USUARIO_LISTADAS: {
+        status: 200,
+        mensagem: 'Lista de badges do usuário retornada com sucesso.'
+    },
+    BADGE_VINCULADA_USUARIO: {
+        status: 201,
+        mensagem: 'Badge vinculada ao usuário com sucesso.'
+    },
+    BADGE_DESVINCULADA_USUARIO: {
+        status: 200,
+        mensagem: 'Badge desvinculada do usuário com sucesso.'
+    },
+    PROGRESSO_BADGE_ATUALIZADO: {
+        status: 200,
+        mensagem: 'Progresso da badge atualizado com sucesso.'
+    },
+    BADGES_ATUALIZADAS: {
+        status: 200,
+        mensagem: 'Badges atualizadas com sucesso.'
+    },
+    BADGE_VALIDADA: {
+        status: 200,
+        mensagem: 'Badge validada com sucesso.'
+    },
 
 //ERRO DA IA
 ERROR_BAD_REQUEST: { sucesso: false, mensagem: 'Parâmetros da solicitação inválidos.' },
 ERROR_INVALID_MESSAGE: { sucesso: false, mensagem: 'A mensagem deve conter entre 1 e 4000 caracteres.' },
 ERROR_CHAT_NOT_FOUND: { sucesso: false, mensagem: 'Chat não encontrado.' },
-ERROR_MODEL_NOT_FOUND: { sucesso: false, mensagem: 'Modelo llama 3 não encontrado. Verifique se ele foi iniciado.' },
-ERROR_AI_TIMEOUT: { sucesso: false, mensagem: 'O llama demorou demais para responder. Tente novamente.' },
+ERROR_MODEL_NOT_FOUND: { sucesso: false, mensagem: 'Modelo qwen3:4b não encontrado no Ollama. Verifique se ele foi baixado.' },
+ERROR_AI_TIMEOUT: { sucesso: false, mensagem: 'O Ollama demorou demais para responder. Tente novamente.' },
 ERROR_AI_PROVIDER: { sucesso: false, mensagem: 'O Ollama retornou uma resposta inválida ou falhou ao processar a mensagem.' },
 ERROR_AI_UNAVAILABLE: { sucesso: false, mensagem: 'O Ollama está indisponível. Verifique se está em execução.' },
 ERROR_INTERNAL_SERVER: { sucesso: false, mensagem: 'Erro interno do servidor.' }
