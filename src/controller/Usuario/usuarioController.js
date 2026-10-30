@@ -1,19 +1,26 @@
 const config_message = require('../modulo/configMensagens.js')
 const crypto = require('crypto')
-const bcrypt = require('bcrypt')
 const codigoOTPModel = require('../../../model/DAO/condigo_OTP/codigo_otp_DAO.js')
 const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
 const { enviarOTP } = require('../../config/email.js')
 
 const OTP_VALIDADE_MS = 5 * 60 * 1000
-const SALT_ROUNDS = 10
 const SENHA_MIN_CARACTERES = 8
+
+// Campos que o próprio usuário pode editar (xp, nível, e-mail e senha ficam de fora)
+const CAMPOS_EDITAVEIS = [
+    'nome',
+    'username',
+    'foto_perfil',
+    'nome_exibicao',
+    'username_social',
+    'biografia_social',
+    'localizacao_estado',
+    'visibilidade'
+]
 
 // Gera OTP de 6 dígitos
 const gerarCodigo = () => crypto.randomInt(100000, 1000000).toString()
-
-// Gera o hash da senha
-const hashSenha = (senha) => bcrypt.hash(String(senha), SALT_ROUNDS)
 
 // Valida tamanho mínimo da senha
 const senhaValida = (senha) =>
@@ -22,8 +29,14 @@ const senhaValida = (senha) =>
 // Valida id numérico positivo
 const idValido = (id) => Number.isInteger(id) && id > 0
 
-// Função auxiliar de rollback (NÃO é handler Express).
-// Nunca lança erro: só registra no log se falhar.
+// Resposta padrão de erro
+const responderErro = (res, cfg) =>
+    res.status(cfg.status).json({ sucesso: false, mensagem: cfg.mensagem })
+
+// Remove a senha do objeto de usuário antes de enviar na resposta
+const semSenha = ({ senha, ...resto }) => resto
+
+// Rollback do cadastro (NÃO é handler Express). Nunca lança erro.
 const removerUsuarioPorId = async (id_usuario) => {
     try {
         await usuarioModel.DeleteUsers(id_usuario)
@@ -41,10 +54,7 @@ const criarCodigoOTPUsuario = async (req, res) => {
         const usuario = req.body
 
         if (!usuario || !usuario.email || !usuario.senha) {
-            return res.status(config_message.CAMPOS_OBRIGATORIOS.status).json({
-                sucesso: false,
-                mensagem: config_message.CAMPOS_OBRIGATORIOS.mensagem
-            })
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
 
         if (!senhaValida(usuario.senha)) {
@@ -57,22 +67,14 @@ const criarCodigoOTPUsuario = async (req, res) => {
         const usuarioExiste = await usuarioModel.ValidarUser(usuario)
 
         if (usuarioExiste) {
-            return res.status(config_message.DADOS_USUARIO_EXISTENTES.status).json({
-                sucesso: false,
-                mensagem: config_message.DADOS_USUARIO_EXISTENTES.mensagem
-            })
+            return responderErro(res, config_message.DADOS_USUARIO_EXISTENTES)
         }
 
-        // 1. cria o usuário primeiro (senha salva como hash)
-        const senhaHash = await hashSenha(usuario.senha)
-
-        id_usuario = await usuarioModel.CreateUsers({ ...usuario, senha: senhaHash })
+        // 1. cria o usuário (o DAO faz o hash da senha)
+        id_usuario = await usuarioModel.CreateUsers(usuario)
 
         if (!id_usuario) {
-            return res.status(config_message.ERRO_CRIAR_USUARIO.status).json({
-                sucesso: false,
-                mensagem: config_message.ERRO_CRIAR_USUARIO.mensagem
-            })
+            return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
         }
 
         // 2. cria o código ligado ao usuário
@@ -86,11 +88,7 @@ const criarCodigoOTPUsuario = async (req, res) => {
 
         if (!id_codigo_otp) {
             await removerUsuarioPorId(id_usuario)
-
-            return res.status(config_message.ERRO_GERAR_OTP.status).json({
-                sucesso: false,
-                mensagem: config_message.ERRO_GERAR_OTP.mensagem
-            })
+            return responderErro(res, config_message.ERRO_GERAR_OTP)
         }
 
         // 3. envia o e-mail; se falhar, apaga o usuário também
@@ -98,13 +96,8 @@ const criarCodigoOTPUsuario = async (req, res) => {
             await enviarOTP(usuario.email, codigo)
         } catch (erroEmail) {
             console.error('Erro ao enviar OTP:', erroEmail)
-
             await removerUsuarioPorId(id_usuario)
-
-            return res.status(config_message.ERRO_ENVIAR_OTP.status).json({
-                sucesso: false,
-                mensagem: config_message.ERRO_ENVIAR_OTP.mensagem
-            })
+            return responderErro(res, config_message.ERRO_ENVIAR_OTP)
         }
 
         return res.status(config_message.USUARIO_CRIADO.status).json({
@@ -119,33 +112,22 @@ const criarCodigoOTPUsuario = async (req, res) => {
             await removerUsuarioPorId(id_usuario)
         }
 
-        return res.status(config_message.ERRO_CRIAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_CRIAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
     }
 }
 
-// Confirma o e-mail do cadastro usando o OTP enviado
-// ASSUNÇÃO: crie no DAO o método MarcarEmailVerificado(id_usuario)
-// e uma coluna como "email_verificado" na tabela de usuário.
+// Confirma o código OTP enviado no cadastro
 const verificarOTPCadastro = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
         const { codigo } = req.body || {}
 
         if (!idValido(id_usuario)) {
-            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
-                sucesso: false,
-                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
-            })
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
         if (!codigo) {
-            return res.status(config_message.CAMPOS_OBRIGATORIOS.status).json({
-                sucesso: false,
-                mensagem: config_message.CAMPOS_OBRIGATORIOS.mensagem
-            })
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
 
         const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
@@ -158,7 +140,6 @@ const verificarOTPCadastro = async (req, res) => {
         }
 
         await codigoOTPModel.MarcarCodigoComoUsado(otp.id_codigo_otp)
-        await usuarioModel.MarcarEmailVerificado(id_usuario)
 
         return res.status(200).json({
             sucesso: true,
@@ -166,36 +147,41 @@ const verificarOTPCadastro = async (req, res) => {
         })
     } catch (error) {
         console.error('Erro ao verificar OTP do cadastro:', error)
-
-        return res.status(config_message.ERRO_GERAR_OTP.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_GERAR_OTP.mensagem
-        })
+        return responderErro(res, config_message.ERRO_GERAR_OTP)
     }
 }
 
 // Atualizar usuário (dados gerais).
-// A senha NÃO pode ser alterada aqui: só pelo fluxo com OTP.
+// Só campos da lista branca; a senha só muda pelo fluxo com OTP.
 const atualizarUsuario = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
 
         if (!idValido(id_usuario)) {
-            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
-                sucesso: false,
-                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
-            })
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const { senha, ...dadosSemSenha } = req.body || {}
+        const dados = Object.fromEntries(
+            Object.entries(req.body || {}).filter(([campo]) => CAMPOS_EDITAVEIS.includes(campo))
+        )
 
-        const usuarioAtualizado = await usuarioModel.UpdateUsers({ ...dadosSemSenha, id_usuario })
+        if (Object.keys(dados).length === 0) {
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
+        }
 
-        if (!usuarioAtualizado) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+        // Se for trocar o username, garante que não pertence a outro usuário
+        if (dados.username) {
+            const existente = await usuarioModel.GetUsuarioByUsername(dados.username)
+
+            if (existente && existente.id !== id_usuario) {
+                return responderErro(res, config_message.DADOS_USUARIO_EXISTENTES)
+            }
+        }
+
+        const atualizado = await usuarioModel.UpdateUsers({ ...dados, id_usuario })
+
+        if (!atualizado) {
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
 
         return res.status(config_message.USUARIO_ATUALIZADO.status).json({
@@ -204,11 +190,7 @@ const atualizarUsuario = async (req, res) => {
         })
     } catch (error) {
         console.error('Erro ao atualizar usuário:', error)
-
-        return res.status(config_message.ERRO_ATUALIZAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_ATUALIZAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
     }
 }
 
@@ -218,19 +200,13 @@ const solicitarOTPAlteracaoSenha = async (req, res) => {
         const id_usuario = Number(req.params.id_usuario)
 
         if (!idValido(id_usuario)) {
-            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
-                sucesso: false,
-                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
-            })
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
         const usuario = await usuarioModel.GetUsuarioById(id_usuario)
 
         if (!usuario) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
 
         const codigo = gerarCodigo()
@@ -242,21 +218,14 @@ const solicitarOTPAlteracaoSenha = async (req, res) => {
         })
 
         if (!id_codigo_otp) {
-            return res.status(config_message.ERRO_GERAR_OTP.status).json({
-                sucesso: false,
-                mensagem: config_message.ERRO_GERAR_OTP.mensagem
-            })
+            return responderErro(res, config_message.ERRO_GERAR_OTP)
         }
 
         try {
             await enviarOTP(usuario.email, codigo)
         } catch (erroEmail) {
             console.error('Erro ao enviar OTP:', erroEmail)
-
-            return res.status(config_message.ERRO_ENVIAR_OTP.status).json({
-                sucesso: false,
-                mensagem: config_message.ERRO_ENVIAR_OTP.mensagem
-            })
+            return responderErro(res, config_message.ERRO_ENVIAR_OTP)
         }
 
         return res.status(200).json({
@@ -265,11 +234,7 @@ const solicitarOTPAlteracaoSenha = async (req, res) => {
         })
     } catch (error) {
         console.error('Erro ao solicitar OTP:', error)
-
-        return res.status(config_message.ERRO_GERAR_OTP.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_GERAR_OTP.mensagem
-        })
+        return responderErro(res, config_message.ERRO_GERAR_OTP)
     }
 }
 
@@ -280,17 +245,11 @@ const alterarSenhaComOTP = async (req, res) => {
         const { codigo, nova_senha } = req.body || {}
 
         if (!idValido(id_usuario)) {
-            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
-                sucesso: false,
-                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
-            })
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
         if (!codigo || !nova_senha) {
-            return res.status(config_message.CAMPOS_OBRIGATORIOS.status).json({
-                sucesso: false,
-                mensagem: config_message.CAMPOS_OBRIGATORIOS.mensagem
-            })
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
 
         if (!senhaValida(nova_senha)) {
@@ -300,7 +259,12 @@ const alterarSenhaComOTP = async (req, res) => {
             })
         }
 
-        // ASSUNÇÃO: retorna o OTP não usado e não expirado, ou null
+        const usuario = await usuarioModel.GetUsuarioById(id_usuario)
+
+        if (!usuario) {
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
+        }
+
         const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
 
         if (!otp) {
@@ -313,15 +277,11 @@ const alterarSenhaComOTP = async (req, res) => {
         // Invalida o código ANTES de trocar a senha, para não permitir reuso
         await codigoOTPModel.MarcarCodigoComoUsado(otp.id_codigo_otp)
 
-        const senhaHash = await hashSenha(nova_senha)
-
-        const atualizado = await usuarioModel.UpdateUsers({ id_usuario, senha: senhaHash })
+        // Senha em texto puro: o DAO faz o hash
+        const atualizado = await usuarioModel.UpdateUsers({ id_usuario, senha: nova_senha })
 
         if (!atualizado) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+            return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
         }
 
         return res.status(config_message.USUARIO_ATUALIZADO.status).json({
@@ -330,11 +290,7 @@ const alterarSenhaComOTP = async (req, res) => {
         })
     } catch (error) {
         console.error('Erro ao alterar senha:', error)
-
-        return res.status(config_message.ERRO_ATUALIZAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_ATUALIZAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
     }
 }
 
@@ -344,19 +300,13 @@ const deletarUsuario = async (req, res) => {
         const id_usuario = Number(req.params.id_usuario)
 
         if (!idValido(id_usuario)) {
-            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
-                sucesso: false,
-                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
-            })
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const usuarioDeletado = await usuarioModel.DeleteUsers(id_usuario)
+        const deletado = await usuarioModel.DeleteUsers(id_usuario)
 
-        if (!usuarioDeletado) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+        if (!deletado) {
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
 
         return res.status(config_message.USUARIO_DELETADO.status).json({
@@ -365,11 +315,7 @@ const deletarUsuario = async (req, res) => {
         })
     } catch (error) {
         console.error('Erro ao deletar usuário:', error)
-
-        return res.status(config_message.ERRO_DELETAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_DELETAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_DELETAR_USUARIO)
     }
 }
 
@@ -379,35 +325,23 @@ const buscarUsuarioPorUsername = async (req, res) => {
         const { username } = req.params
 
         if (!username) {
-            return res.status(config_message.USERNAME_OBRIGATORIO.status).json({
-                sucesso: false,
-                mensagem: config_message.USERNAME_OBRIGATORIO.mensagem
-            })
+            return responderErro(res, config_message.USERNAME_OBRIGATORIO)
         }
 
         const usuario = await usuarioModel.GetUsuarioByUsername(username)
 
         if (!usuario) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
-
-        const { senha, ...usuarioSemSenha } = usuario
 
         return res.status(config_message.USUARIO_ENCONTRADO.status).json({
             sucesso: true,
             mensagem: config_message.USUARIO_ENCONTRADO.mensagem,
-            usuario: usuarioSemSenha
+            usuario: semSenha(usuario)
         })
     } catch (error) {
         console.error('Erro ao buscar usuário:', error)
-
-        return res.status(config_message.ERRO_BUSCAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_BUSCAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_BUSCAR_USUARIO)
     }
 }
 
@@ -416,7 +350,11 @@ const buscarTodosUsuarios = async (req, res) => {
     try {
         const usuarios = await usuarioModel.GetAllUsers()
 
-        const usuariosSemSenha = usuarios.map(({ senha, ...usuario }) => usuario)
+        if (usuarios === false) {
+            return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
+        }
+
+        const usuariosSemSenha = usuarios.map(semSenha)
 
         return res.status(config_message.USUARIOS_ENCONTRADOS.status).json({
             sucesso: true,
@@ -426,11 +364,7 @@ const buscarTodosUsuarios = async (req, res) => {
         })
     } catch (error) {
         console.error('Erro ao buscar usuários:', error)
-
-        return res.status(config_message.ERRO_BUSCAR_USUARIOS.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_BUSCAR_USUARIOS.mensagem
-        })
+        return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
     }
 }
 
@@ -440,35 +374,23 @@ const buscarUsuarioPorId = async (req, res) => {
         const id_usuario = Number(req.params.id_usuario)
 
         if (!idValido(id_usuario)) {
-            return res.status(config_message.ID_USUARIO_INVALIDO.status).json({
-                sucesso: false,
-                mensagem: config_message.ID_USUARIO_INVALIDO.mensagem
-            })
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
         const usuario = await usuarioModel.GetUsuarioById(id_usuario)
 
         if (!usuario) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
-
-        const { senha, ...usuarioSemSenha } = usuario
 
         return res.status(config_message.USUARIO_ENCONTRADO.status).json({
             sucesso: true,
             mensagem: config_message.USUARIO_ENCONTRADO.mensagem,
-            usuario: usuarioSemSenha
+            usuario: semSenha(usuario)
         })
     } catch (error) {
         console.error('Erro ao buscar usuário por ID:', error)
-
-        return res.status(config_message.ERRO_BUSCAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_BUSCAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_BUSCAR_USUARIO)
     }
 }
 
@@ -487,77 +409,48 @@ const buscarUsuarioPorEmail = async (req, res) => {
         const usuario = await usuarioModel.GetUsuarioByEmail(email)
 
         if (!usuario) {
-            return res.status(config_message.USUARIO_NAO_ENCONTRADO.status).json({
-                sucesso: false,
-                mensagem: config_message.USUARIO_NAO_ENCONTRADO.mensagem
-            })
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
-
-        const { senha, ...usuarioSemSenha } = usuario
 
         return res.status(config_message.USUARIO_ENCONTRADO.status).json({
             sucesso: true,
             mensagem: config_message.USUARIO_ENCONTRADO.mensagem,
-            usuario: usuarioSemSenha
+            usuario: semSenha(usuario)
         })
     } catch (error) {
         console.error('Erro ao buscar usuário por email:', error)
-
-        return res.status(config_message.ERRO_BUSCAR_USUARIO.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_BUSCAR_USUARIO.mensagem
-        })
+        return responderErro(res, config_message.ERRO_BUSCAR_USUARIO)
     }
 }
 
+// Login
 const login = async (req, res) => {
     try {
         const { email, senha } = req.body || {}
 
         if (!email || !senha) {
-            return res.status(config_message.CAMPOS_OBRIGATORIOS.status).json({
-                sucesso: false,
-                mensagem: config_message.CAMPOS_OBRIGATORIOS.mensagem
-            })
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
 
         const usuario = await usuarioModel.GetUsuarioByEmail(email)
 
         const senhaCorreta = usuario
-            ? await bcrypt.compare(String(senha), usuario.senha)
+            ? await usuarioModel.ValidarSenha(senha, usuario.senha)
             : false
 
         // Mesma resposta para e-mail inexistente e senha errada
         if (!senhaCorreta) {
-            return res.status(config_message.SENHA_INVALIDA.status).json({
-                sucesso: false,
-                mensagem: config_message.SENHA_INVALIDA.mensagem
-            })
+            return responderErro(res, config_message.SENHA_INVALIDA)
         }
-
-        // Bloqueia contas com e-mail ainda não confirmado.
-        // (Só age se a coluna "email_verificado" existir e for false.)
-        if (usuario.email_verificado === false) {
-            return res.status(403).json({
-                sucesso: false,
-                mensagem: 'Confirme seu e-mail com o código OTP antes de entrar.'
-            })
-        }
-
-        const { senha: _senha, ...usuarioSemSenha } = usuario
 
         return res.status(config_message.LOGIN_SUCESSO.status).json({
             sucesso: true,
             mensagem: config_message.LOGIN_SUCESSO.mensagem,
-            usuario: usuarioSemSenha
+            usuario: semSenha(usuario)
         })
     } catch (error) {
         console.error('Erro ao realizar login:', error)
-
-        return res.status(config_message.ERRO_LOGIN.status).json({
-            sucesso: false,
-            mensagem: config_message.ERRO_LOGIN.mensagem
-        })
+        return responderErro(res, config_message.ERRO_LOGIN)
     }
 }
 
