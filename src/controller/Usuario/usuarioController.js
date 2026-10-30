@@ -139,7 +139,7 @@ const verificarOTPCadastro = async (req, res) => {
             })
         }
 
-        await codigoOTPModel.MarcarCodigoComoUsado(otp.id_codigo_otp)
+        await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
 
         return res.status(200).json({
             sucesso: true,
@@ -275,7 +275,7 @@ const alterarSenhaComOTP = async (req, res) => {
         }
 
         // Invalida o código ANTES de trocar a senha, para não permitir reuso
-        await codigoOTPModel.MarcarCodigoComoUsado(otp.id_codigo_otp)
+        await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
 
         // Senha em texto puro: o DAO faz o hash
         const atualizado = await usuarioModel.UpdateUsers({ id_usuario, senha: nova_senha })
@@ -368,6 +368,26 @@ const buscarTodosUsuarios = async (req, res) => {
     }
 }
 
+const buscarTodosCodigos = async (req, res) => {
+    try {
+        const codigos = await codigoOTPModel.GetAllCodigoOTP()
+
+       if (codigos === false) {
+            return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
+        }
+
+        return res.status(config_message.USUARIOS_ENCONTRADOS.status).json({
+            sucesso: true,
+            mensagem: config_message.USUARIOS_ENCONTRADOS.mensagem,
+            quantidade: codigos.length,
+            codigos: codigos
+        })
+    } catch (error) {
+        console.error('Erro ao buscar usuários:', error)
+        return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
+    }
+}
+
 // Buscar usuário pelo ID
 const buscarUsuarioPorId = async (req, res) => {
     try {
@@ -453,6 +473,38 @@ const login = async (req, res) => {
         return responderErro(res, config_message.ERRO_LOGIN)
     }
 }
+
+const validarCodigoOTP = async (req, res) => {
+    try {
+        const id_usuario = Number(req.params.id_usuario)
+        const { codigo } = req.body || {}
+
+        if (!idValido(id_usuario) || !codigo) {
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
+        }
+        
+        const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
+
+        if (!otp) {
+            return res.status(400).json({
+                sucesso: false,
+                mensagem: 'Código inválido ou expirado.'
+            })
+        }
+
+        await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
+
+        return res.status(200).json({
+            sucesso: true,
+            mensagem: 'Código OTP validado com sucesso.'
+        })
+    } catch (error) {
+        console.error('Erro ao validar código OTP:', error)
+        return responderErro(res, config_message.ERRO_GERAR_OTP)
+    }
+}
+
+
 module.exports = {
     criarCodigoOTPUsuario,
     verificarOTPCadastro,
@@ -464,5 +516,7 @@ module.exports = {
     buscarTodosUsuarios,
     buscarUsuarioPorId,
     buscarUsuarioPorEmail,
-    login
+    login,
+    validarCodigoOTP,
+    buscarTodosCodigos
 }
