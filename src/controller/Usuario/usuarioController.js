@@ -92,16 +92,6 @@ const criarCodigoOTPUsuario = async (req, res) => {
             })
         }
 
-        // Valida o dispositivo ANTES de criar qualquer coisa
-        const dispositivo = montarDispositivo(usuario.dispositivo)
-
-        if (!dispositivo) {
-            return res.status(400).json({
-                sucesso: false,
-                mensagem: 'Dados do dispositivo obrigatórios (nome, sistema_operacional e identificador).'
-            })
-        }
-
         const usuarioExiste = await usuarioModel.ValidarUser(usuario)
 
         if (usuarioExiste) {
@@ -116,19 +106,7 @@ const criarCodigoOTPUsuario = async (req, res) => {
         }
 
         // 2. cria o dispositivo ligado ao usuário
-        id_dispositivo = await dispositivoModel.CreateDispositivo({
-            ...dispositivo,
-            id_usuario
-        })
-
-        if (!id_dispositivo) {
-            await desfazerCadastro(id_usuario, null)
-            return res.status(500).json({
-                sucesso: false,
-                mensagem: 'Erro ao cadastrar o dispositivo.'
-            })
-        }
-
+     
         // 3. cria o código ligado ao usuário
         const codigo = gerarCodigo()
 
@@ -496,7 +474,7 @@ const buscarUsuarioPorEmail = async (req, res) => {
 // Login
 const login = async (req, res) => {
     try {
-        const { username, email, senha } = req.body || {}
+        const { username, email, senha, dispositivo} = req.body || {}
         const loginInformado = (username || email ).trim()
 
         if (!loginInformado || !senha) {
@@ -512,9 +490,32 @@ const login = async (req, res) => {
             ? await usuarioModel.ValidarSenha(senha, usuario.senha)
             : false
 
+         const aparelho = montarDispositivo(dispositivo)
+
+            if (!dispositivo) {
+                return res.status(400).json({
+                    sucesso: false,
+                    mensagem: 'Dados do dispositivo obrigatórios (nome, sistema_operacional e identificador).'
+                })
+            }
+
         if (!senhaCorreta) {
             return responderErro(res, config_message.SENHA_INVALIDA)
         }
+
+         id_dispositivo = await dispositivoModel.CreateDispositivo({
+            ...dispositivo,
+            id_usuario
+        })
+
+        if (!id_dispositivo) {
+            await desfazerCadastro(id_usuario, null)
+            return res.status(500).json({
+                sucesso: false,
+                mensagem: 'Erro ao cadastrar o dispositivo.'
+            })
+        }
+
 
         return res.status(config_message.LOGIN_SUCESSO.status).json({
             sucesso: true,

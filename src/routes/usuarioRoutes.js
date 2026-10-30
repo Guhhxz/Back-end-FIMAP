@@ -2,6 +2,7 @@ const express = require("express")
 const router = express.Router()
 
 const usuarioController = require("../controller/Usuario/usuarioController.js")
+const dispositivoController = require("../controller/dispositivos/dispositivosController.js")
 
 
 // Cadastro e autenticação por OTP
@@ -20,7 +21,7 @@ router.get("/usuario/id/:id_usuario", usuarioController.buscarUsuarioPorId)
 router.get("/usuario/email/:email", usuarioController.buscarUsuarioPorEmail)
 router.get("/usuarios", usuarioController.buscarTodosUsuarios)
 router.get("/otp/codigos", usuarioController.buscarTodosCodigos)
-
+router.get("todos/dispositivos", dispositivoController.buscarTodosDispositivos)
 // Deletar usuário
 router.delete("/usuario-delete/:id_usuario", usuarioController.deletarUsuario)
 
