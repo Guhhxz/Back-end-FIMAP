@@ -46,31 +46,10 @@ const CreateUsers = async (usuario) => {
 
 // Atualizar usuário
 const UpdateUsers = async (usuario) => {
-
-    
-    let sqlSenha = `update tbl_usuario
-    set senha = ?
-    where id = ?`
-
     try {
-        // Atualizar a senha separadamente, caso ela tenha sido enviada
-        if (usuario.senha !== undefined) {
-            const senhaHash = await bcrypt.hash(usuario.senha, 10)
-
-            let resultSenha = await knexConex.raw(sqlSenha, [
-                senhaHash,
-                usuario.id_usuario
-            ])
-
-            if (resultSenha[0].affectedRows === 0) {
-                return false
-            }
-        }
-
-        // Atualizar os demais campos enviados
+        // Objeto base com todos os campos que podem ser atualizados
         const campos = {
             nome: usuario.nome,
-            cpf: usuario.cpf,
             email: usuario.email,
             username: usuario.username,
             xp_usuario: usuario.xp_usuario,
@@ -83,9 +62,16 @@ const UpdateUsers = async (usuario) => {
             visibilidade: usuario.visibilidade
         }
 
+        // Se a senha foi enviada, faz o hash e adiciona aos campos a atualizar
+        if (usuario.senha !== undefined && usuario.senha !== '') {
+            const senhaHash = await bcrypt.hash(usuario.senha, 10)
+            campos.senha = senhaHash
+        }
+
         const atualizacoes = []
         const valores = []
 
+        // Filtra apenas os campos que foram enviados (não são undefined)
         Object.entries(campos).forEach(([campo, valor]) => {
             if (valor !== undefined) {
                 atualizacoes.push(`${campo} = ?`)
@@ -93,26 +79,26 @@ const UpdateUsers = async (usuario) => {
             }
         })
 
+        // Se nenhum campo foi enviado para atualizar
         if (atualizacoes.length === 0) {
-            return usuario.senha !== undefined
+            return false
         }
 
-        let sql = `update tbl_usuario
-            set ${atualizacoes.join(', ')}
-            where id = ?`
-
+        // Monta a query dinamicamente
+        let sql = `update tbl_usuario set ${atualizacoes.join(', ')} where id = ?`
         valores.push(usuario.id_usuario)
 
         let result = await knexConex.raw(sql, valores)
 
-        if (result) return result[0].affectedRows > 0
+        // Compatibilidade de retorno com MySQL/MariaDB ou PostgreSQL
+        const afetados = result[0]?.affectedRows ?? result.rowCount ?? 0
+        return afetados > 0
 
     } catch (error) {
-        console.error('Erro ao atualizar usuário:', error)
+        console.error('Erro ao atualizar todos os dados do usuário:', error)
         return false
     }
 }
-
 // Deletar usuário
 const DeleteUsers = async (id_usuario) => {
     let sql = `delete from tbl_usuario
@@ -211,6 +197,38 @@ const ValidarSenha = async (senhaDigitada, senhaHash) => {
     }
 }
 
+// Buscar usuário pelo ID
+const GetUsuarioById = async (id_usuario) => {
+    let sql = `select * from tbl_usuario
+        where id = ?`
+
+    try {
+        let result = await knexConex.raw(sql, [id_usuario])
+
+        if (result) return result[0][0] || null
+
+    } catch (error) {
+        console.error('Erro ao buscar usuário por ID:', error)
+        return false
+    }
+}
+
+// Buscar usuário pelo email
+const GetUsuarioByEmail = async (email) => {
+    let sql = `select * from tbl_usuario
+        where email = ?`
+
+    try {
+        let result = await knexConex.raw(sql, [email])
+
+        if (result) return result[0][0] || null
+
+    } catch (error) {
+        console.error('Erro ao buscar usuário por email:', error)
+        return false
+    }
+}
+
 module.exports = {
     CreateUsers,
     UpdateUsers,
@@ -218,5 +236,7 @@ module.exports = {
     GetUsuarioByUsername,
     GetAllUsers,
     ValidarUser,
-    ValidarSenha
+    ValidarSenha,
+    GetUsuarioById,
+    GetUsuarioByEmail
 }
