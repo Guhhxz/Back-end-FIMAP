@@ -32,6 +32,7 @@ app.get("/", (req, res) => {
 app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
 app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
 
+
 app.post("/v1/autenticacao/senha/recuperacao/redefinir", redefinirSenhaController.redefinirSenha)
 
 app.use("/v1/openfinance", openFinanceRoutes)
