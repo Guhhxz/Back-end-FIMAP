@@ -10,7 +10,6 @@ const cors = require("cors")
 const openFinanceRoutes = require("./routes/openFinanceRoutes")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
-const redefinirSenhaController = require("./controller/Autenticacao/redefinirSenhaController.js")
 
 const app = express()
 
@@ -33,7 +32,6 @@ app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagens
 app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
 
 
-app.post("/v1/autenticacao/senha/recuperacao/redefinir", redefinirSenhaController.redefinirSenha)
 
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)

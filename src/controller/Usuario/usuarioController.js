@@ -1,6 +1,7 @@
 const config_message = require('../modulo/configMensagens.js')
 const crypto = require('crypto')
 const codigoOTPModel = require('../../../model/DAO/condigo_OTP/codigo_otp_DAO.js')
+const dispositivoModel = require('../../../model/DAO/Dispositivos/dispositivos.js')
 const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
 const { enviarOTP } = require('../../config/email.js')
 
@@ -36,19 +37,46 @@ const responderErro = (res, cfg) =>
 // Remove a senha do objeto de usuário antes de enviar na resposta
 const semSenha = ({ senha, ...resto }) => resto
 
-// Rollback do cadastro (NÃO é handler Express). Nunca lança erro.
-const removerUsuarioPorId = async (id_usuario) => {
-    try {
-        await usuarioModel.DeleteUsers(id_usuario)
-    } catch (erro) {
-        console.error('Erro no rollback do usuário:', erro)
+// Valida e normaliza os dados do dispositivo enviados no cadastro
+const montarDispositivo = (dados) => {
+    const { nome, sistema_operacional, identificador } = dados || {}
+
+    if (!nome || !sistema_operacional || !identificador) {
+        return null
+    }
+
+    return {
+        nome: String(nome).trim(),
+        sistema_operacional: String(sistema_operacional).trim(),
+        identificador: String(identificador).trim()
     }
 }
 
-// Cria o usuário, depois o OTP, e envia por e-mail.
-// Se o OTP não for criado ou enviado, o usuário é apagado.
+// Rollback do cadastro (NÃO é handler Express). Nunca lança erro.
+// Apaga o dispositivo primeiro (ele depende do usuário) e depois o usuário.
+const desfazerCadastro = async (id_usuario, id_dispositivo) => {
+    if (id_dispositivo) {
+        try {
+            await dispositivoModel.DeletarDispositivo(id_dispositivo)
+        } catch (erro) {
+            console.error('Erro no rollback do dispositivo:', erro)
+        }
+    }
+
+    if (id_usuario) {
+        try {
+            await usuarioModel.DeleteUsers(id_usuario)
+        } catch (erro) {
+            console.error('Erro no rollback do usuário:', erro)
+        }
+    }
+}
+
+// Cria o usuário, o dispositivo, o OTP, e envia por e-mail.
+// Se qualquer etapa falhar, tudo que foi criado é apagado.
 const criarCodigoOTPUsuario = async (req, res) => {
     let id_usuario = null
+    let id_dispositivo = null
 
     try {
         const usuario = req.body
@@ -61,6 +89,16 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return res.status(400).json({
                 sucesso: false,
                 mensagem: `A senha deve ter pelo menos ${SENHA_MIN_CARACTERES} caracteres.`
+            })
+        }
+
+        // Valida o dispositivo ANTES de criar qualquer coisa
+        const dispositivo = montarDispositivo(usuario.dispositivo)
+
+        if (!dispositivo) {
+            return res.status(400).json({
+                sucesso: false,
+                mensagem: 'Dados do dispositivo obrigatórios (nome, sistema_operacional e identificador).'
             })
         }
 
@@ -77,7 +115,21 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
         }
 
-        // 2. cria o código ligado ao usuário
+        // 2. cria o dispositivo ligado ao usuário
+        id_dispositivo = await dispositivoModel.CreateDispositivo({
+            ...dispositivo,
+            id_usuario
+        })
+
+        if (!id_dispositivo) {
+            await desfazerCadastro(id_usuario, null)
+            return res.status(500).json({
+                sucesso: false,
+                mensagem: 'Erro ao cadastrar o dispositivo.'
+            })
+        }
+
+        // 3. cria o código ligado ao usuário
         const codigo = gerarCodigo()
 
         const id_codigo_otp = await codigoOTPModel.CreateCodigoOTP({
@@ -87,31 +139,28 @@ const criarCodigoOTPUsuario = async (req, res) => {
         })
 
         if (!id_codigo_otp) {
-            await removerUsuarioPorId(id_usuario)
+            await desfazerCadastro(id_usuario, id_dispositivo)
             return responderErro(res, config_message.ERRO_GERAR_OTP)
         }
 
-        // 3. envia o e-mail; se falhar, apaga o usuário também
+        // 4. envia o e-mail; se falhar, apaga tudo
         try {
             await enviarOTP(usuario.email, codigo)
         } catch (erroEmail) {
             console.error('Erro ao enviar OTP:', erroEmail)
-            await removerUsuarioPorId(id_usuario)
+            await desfazerCadastro(id_usuario, id_dispositivo)
             return responderErro(res, config_message.ERRO_ENVIAR_OTP)
         }
 
         return res.status(config_message.USUARIO_CRIADO.status).json({
             sucesso: true,
             mensagem: 'Usuário criado. Verifique seu e-mail para obter o código OTP.',
-            id_usuario
+            id_usuario,
+            id_dispositivo
         })
     } catch (error) {
         console.error('Erro ao criar usuário:', error)
-
-        if (id_usuario) {
-            await removerUsuarioPorId(id_usuario)
-        }
-
+        await desfazerCadastro(id_usuario, id_dispositivo)
         return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
     }
 }
@@ -368,11 +417,12 @@ const buscarTodosUsuarios = async (req, res) => {
     }
 }
 
+// Buscar todos os códigos OTP (sem expor o valor do código)
 const buscarTodosCodigos = async (req, res) => {
     try {
         const codigos = await codigoOTPModel.GetAllCodigoOTP()
 
-       if (codigos === false) {
+        if (codigos === false) {
             return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
         }
 
@@ -380,10 +430,10 @@ const buscarTodosCodigos = async (req, res) => {
             sucesso: true,
             mensagem: config_message.USUARIOS_ENCONTRADOS.mensagem,
             quantidade: codigos.length,
-            codigos: codigos
+            codigos
         })
     } catch (error) {
-        console.error('Erro ao buscar usuários:', error)
+        console.error('Erro ao buscar códigos OTP:', error)
         return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
     }
 }
@@ -446,19 +496,22 @@ const buscarUsuarioPorEmail = async (req, res) => {
 // Login
 const login = async (req, res) => {
     try {
-        const { email, senha } = req.body || {}
+        const { username, email, senha } = req.body || {}
+        const loginInformado = (username || email ).trim()
 
-        if (!email || !senha) {
+        if (!loginInformado || !senha) {
             return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
 
-        const usuario = await usuarioModel.GetUsuarioByEmail(email)
+        // "@" indica e-mail, senão é username
+        const usuario = loginInformado.includes('@')
+            ? await usuarioModel.GetUsuarioByEmail(loginInformado)
+            : await usuarioModel.GetUsuarioByUsername(loginInformado)
 
         const senhaCorreta = usuario
             ? await usuarioModel.ValidarSenha(senha, usuario.senha)
             : false
 
-        // Mesma resposta para e-mail inexistente e senha errada
         if (!senhaCorreta) {
             return responderErro(res, config_message.SENHA_INVALIDA)
         }
@@ -474,6 +527,7 @@ const login = async (req, res) => {
     }
 }
 
+// Valida (e consome) um código OTP
 const validarCodigoOTP = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
@@ -482,7 +536,7 @@ const validarCodigoOTP = async (req, res) => {
         if (!idValido(id_usuario) || !codigo) {
             return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
-        
+
         const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
 
         if (!otp) {
@@ -503,7 +557,6 @@ const validarCodigoOTP = async (req, res) => {
         return responderErro(res, config_message.ERRO_GERAR_OTP)
     }
 }
-
 
 module.exports = {
     criarCodigoOTPUsuario,
