@@ -5,7 +5,7 @@ module.exports = {
       connection: {
         host: 'localhost', 
         user: 'root', 
-        password: 'Vieira0!', 
+        password: 'bcd127', 
         database: 'db_fimap_2026',
         port: 3306, // Porta padrão do MySQL
        
