@@ -162,6 +162,69 @@ const listarCartoes = async (itemId) => {
 }
 
 // ============================================
+// FATURAS
+// ============================================
+
+const listarFaturas = async (itemId) => {
+    const resultado = await listarCartoes(itemId)
+
+    if (resultado.atualizando) {
+        return {
+            atualizando: true,
+            cartoes: [],
+        }
+    }
+
+    const cartoes = await Promise.all(
+        resultado.cartoes.map(async (cartao) => {
+            let faturas = []
+
+            try {
+                const resposta = await pluggy.fetchCreditCardBills(cartao.id)
+
+                faturas = obterResultados(resposta)
+                    .map((fatura) => ({
+                        id: fatura.id,
+                        vencimento: fatura.dueDate ?? null,
+                        diasParaVencimento: diasAte(fatura.dueDate),
+                        valorTotal: numeroOuNull(fatura.totalAmount) ?? 0,
+                        moeda: fatura.totalAmountCurrencyCode ?? cartao.moeda,
+                        pagamentoMinimo: numeroOuNull(fatura.minimumPaymentAmount),
+                        permiteParcelamento: fatura.allowsInstallments ?? null,
+                        encargos: fatura.financeCharges ?? [],
+                    }))
+                    .sort(
+                        (a, b) =>
+                            new Date(b.vencimento).getTime() -
+                            new Date(a.vencimento).getTime()
+                    )
+            } catch (error) {
+                // Falha em um cartão não derruba os demais
+                console.error(`Erro ao buscar faturas do cartão ${cartao.id}:`, error)
+            }
+
+            return {
+                cartaoId: cartao.id,
+                cartaoNome: cartao.nome,
+                instituicao: cartao.instituicao,
+                faturaAberta: cartao.faturaAberta,
+                limite: cartao.limite,
+                limiteDisponivel: cartao.limiteDisponivel,
+                dataFechamentoFatura: cartao.dataFechamentoFatura,
+                dataVencimentoFatura: cartao.dataVencimentoFatura,
+                faturas,
+            }
+        })
+    )
+
+    return {
+        atualizando: false,
+        total: cartoes.length,
+        cartoes,
+    }
+}
+
+// ============================================
 // INVESTIMENTOS
 // ============================================
 
@@ -198,6 +261,35 @@ const listarInvestimentos = async (itemId) => {
         atualizando: false,
         total: investimentos.length,
         investimentos,
+    }
+}
+
+// ============================================
+// ATIVOS (contas bancárias + investimentos)
+// ============================================
+
+const listarAtivos = async (itemId) => {
+    const [saldo, investimentos] = await Promise.all([
+        buscarSaldo(itemId),
+        listarInvestimentos(itemId),
+    ])
+
+    if (saldo.atualizando || investimentos.atualizando) {
+        return { atualizando: true }
+    }
+
+    const totalInvestido = investimentos.investimentos.reduce(
+        (total, item) => total + (Number(item.valor) || 0),
+        0
+    )
+
+    return {
+        atualizando: false,
+        patrimonioTotal: saldo.saldoTotal + totalInvestido,
+        saldoContas: saldo.saldoTotal,
+        totalInvestido,
+        contas: saldo.contas,
+        investimentos: investimentos.investimentos,
     }
 }
 
@@ -351,4 +443,6 @@ module.exports = {
     listarTransacoes,
     adicionarConexao,
     listarConexoesPorUsuario,
+    listarFaturas,
+    listarAtivos
 }

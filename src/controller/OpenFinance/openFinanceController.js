@@ -73,6 +73,52 @@ async function obterContas(req, res) {
     }
 }
 
+async function obterFaturas(req, res) {
+    try {
+        const { itemId } = req.params
+
+        if (!itemId) {
+            return res.status(400).json({ erro: "Informe o itemId." })
+        }
+
+        const resultado = await pluggyService.listarFaturas(itemId)
+
+        if (resultado.atualizando) {
+            return res.status(202).json({
+                mensagem: "Conexão ainda sincronizando. Tente novamente em alguns segundos."
+            })
+        }
+
+        return res.status(200).json(resultado)
+    } catch (error) {
+        console.error("Erro ao buscar faturas:", error)
+        return res.status(500).json({ erro: "Não foi possível buscar as faturas." })
+    }
+}
+
+async function obterAtivos(req, res) {
+    try {
+        const { itemId } = req.params
+
+        if (!itemId) {
+            return res.status(400).json({ erro: "Informe o itemId." })
+        }
+
+        const resultado = await pluggyService.listarAtivos(itemId)
+
+        if (resultado.atualizando) {
+            return res.status(202).json({
+                mensagem: "Conexão ainda sincronizando. Tente novamente em alguns segundos."
+            })
+        }
+
+        return res.status(200).json(resultado)
+    } catch (error) {
+        console.error("Erro ao buscar ativos:", error)
+        return res.status(500).json({ erro: "Não foi possível buscar os ativos." })
+    }
+}
+
 async function obterCartoes(req, res) {
     try {
         const { itemId } = req.params
@@ -265,6 +311,8 @@ module.exports = {
     obterTransacoes,
     obterResumosBancario,
     adicionarConexao,
-    listarConexoes
+    listarConexoes,
+    obterFaturas,
+    obterAtivos
 }
 

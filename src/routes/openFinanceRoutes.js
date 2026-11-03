@@ -17,6 +17,8 @@ router.get("/financeiro/emprestimos/:itemId", openFinanceController.obterEmprest
 router.get("/financeiro/transacoes/:itemId", openFinanceController.obterTransacoes)
 router.get("/financeiro/saldo/:itemId", openFinanceController.obterSaldo)
 router.get("/financeiro/resumo", openFinanceController.obterResumosBancario)
+router.get("/financeiro/faturas/:itemId", openFinanceController.obterFaturas)
+router.get("/financeiro/ativos/:itemId", openFinanceController.obterAtivos)
 
 
 module.exports = router
