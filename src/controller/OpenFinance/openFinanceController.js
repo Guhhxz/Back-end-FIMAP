@@ -1,5 +1,6 @@
 const pluggyService = require("../../services/pluggyService")
 const pluggyDashboardService = require("../../services/dashboardService.js")
+const conexaoDAO = require("../../../model/DAO/OpenFinance/conexaoOpenFinanceDAO.js")
 
 async function gerarConnectToken(req, res) {
     try {
@@ -195,6 +196,64 @@ async function obterResumosBancario(req, res) {
     }
 }
 
+async function adicionarConexao(req, res) {
+    try {
+        const { idUsuario } = req.params
+        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id } = req.body
+
+        if (!idUsuario) {
+            return res.status(400).json({ erro: "Informe o ID do usuário." })
+        }
+
+        if (status === undefined || status === null) {
+            return res.status(400).json({ erro: "Informe o status da conexão." })
+        }
+
+        const conexao = {
+            status,
+            consentimento_api,
+            ultima_sincronizacao,
+            provedor,
+            external_connection_id,
+            id_usuario: idUsuario
+        }
+
+        const resultado = await pluggyService.adicionarConexao(conexao)
+
+        if (!resultado) {
+            return res.status(500).json({ erro: "Não foi possível adicionar a conexão." })
+        }
+
+        return res.status(201).json({
+            mensagem: "Conexão adicionada com sucesso.",
+            id: resultado
+        })
+    } catch (error) {
+        console.error("Erro ao adicionar conexão:", error)
+        return res.status(500).json({ erro: "Não foi possível adicionar a conexão." })
+    }
+}
+
+async function listarConexoes(req, res) {
+    try {
+        const { idUsuario } = req.params
+
+        if (!idUsuario) {
+            return res.status(400).json({ erro: "Informe o ID do usuário." })
+        }
+
+        const conexoes = await pluggyService.listarConexoesPorUsuario(idUsuario)
+
+        return res.status(200).json({
+            total: conexoes.length,
+            conexoes
+        })
+    } catch (error) {
+        console.error("Erro ao listar conexões:", error)
+        return res.status(500).json({ erro: "Não foi possível listar as conexões." })
+    }
+}
+
 
 module.exports = { 
     gerarConnectToken, 
@@ -204,6 +263,8 @@ module.exports = {
     obterInvestimentos,
     obterEmprestimos,
     obterTransacoes,
-    obterResumosBancario
+    obterResumosBancario,
+    adicionarConexao,
+    listarConexoes
 }
 
