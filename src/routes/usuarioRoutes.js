@@ -8,7 +8,7 @@ const dispositivoController = require("../controller/dispositivos/dispositivosCo
 // Cadastro e autenticação por OTP
 router.post("/criar-usuario", usuarioController.criarCodigoOTPUsuario)
 router.post("/codigo-otp/senha/:id_usuario", usuarioController.solicitarOTPAlteracaoSenha)
-router.post("/alterar/senha/:id_usuario", usuarioController.alterarSenhaComOTP)
+router.post("/alterar/verificar-codigo/:id_usuario", usuarioController.verificarCodigoAlteracaoSenha)
 router.post("/login", usuarioController.login)
 router.post("/consultar/otp/:id_usuario", usuarioController.validarCodigoOTP)
 
