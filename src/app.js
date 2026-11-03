@@ -1,4 +1,4 @@
-﻿// Importando as dependÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªncias
+// Importando as dependências
 require("dotenv").config({
     path: require("path").resolve(__dirname, "../.env")
 })
@@ -7,7 +7,7 @@ const express = require("express")
 const cors = require("cors")
 const path = require("path")
 
-// Importando rotas e controller de mensagens
+// Importando rotas e controllers
 const openFinanceRoutes = require("./routes/openFinanceRoutes")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
@@ -57,15 +57,22 @@ app.post('/v1/ia/chat-publico', limitarUsoPublico, chatPublicoController.convers
 app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
 app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
 
-const redefinirSenhaController = require('./controller/Autenticacao/redefinirSenhaController.js')
-app.post('/v1/autenticacao/senha/recuperacao/redefinir', redefinirSenhaController.redefinirSenha)
 
-app.use('/v1', simulacoesRoutes)
 
+app.use("/v1/openfinance", openFinanceRoutes)
+app.use("/v1/openfinance/usuario", usuarioRoutes)
 
 const PORT = process.env.PORT || 8080
-app.listen(PORT, () => {
+
+const servidor = app.listen(PORT, (erro) => {
+    if (erro) {
+        console.error("Erro ao subir o servidor:", erro)
+        process.exit(1)
+    }
     console.log(`Servidor rodando na porta ${PORT}`)
 })
 
-
+servidor.on("error", (erro) => {
+    console.error("Erro no servidor:", erro)
+    process.exit(1)
+})

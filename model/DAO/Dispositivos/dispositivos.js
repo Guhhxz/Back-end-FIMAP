@@ -39,6 +39,19 @@ const GetAllDispositivos = async () => {
     }
 }
 
+const DeleteDispositivosUsuarios = async (id_usuario) => {
+    let sql = `delete from tbl_dispositivo where id_usuario = ?`
+
+    try {
+        const [result] = await knexConex.raw(sql, [id_usuario])
+        return result.affectedRows > 0
+    } catch (error) {
+        console.error('Erro ao deletar dispositivos do usuário:', error)
+        return false
+    }
+}
+
+
 // Verificar se o usuário existe
 const ExisteUsuario = async (id_usuario) => {
     let sql = `select id from tbl_usuario where id = ?`

@@ -8,89 +8,50 @@ const knexConfig = require('../../Database_config_knex/KnexFile.js')
 // Cria a conexão com o banco de dados utilizando as configurações do ambiente "development"
 const knexConex = knex(knexConfig.development)
 
-// Buscar usuário por id
-const GetUsuarioById = async (id_usuario) => {
-    let sql = `select * from tbl_usuario where id = ?`
+const SALT_ROUNDS = 10
 
-    try {
-        let result = await knexConex.raw(sql, [id_usuario])
-        return result ? result[0][0] || null : null
-    } catch (error) {
-        console.error('Erro ao buscar usuário por id:', error)
-        return null
-    }
-}
-
-// Buscar usuário por e-mail
-const GetUsuarioByEmail = async (email) => {
-    let sql = `select * from tbl_usuario where email = ?`
-
-    try {
-        let result = await knexConex.raw(sql, [email])
-        return result ? result[0][0] || null : null
-    } catch (error) {
-        console.error('Erro ao buscar usuário por email:', error)
-        return null
-    }
-}
+// IMPORTANTE: o hash da senha é feito SOMENTE aqui no DAO.
+// Quem chama CreateUsers/UpdateUsers deve enviar a senha em texto puro.
 
 // Criar usuário
 const CreateUsers = async (usuario) => {
-    let sql = `insert into tbl_usuario
+    const sql = `insert into tbl_usuario
         (nome, cpf, email, username, senha, xp_usuario, nivel_total,
         foto_perfil, nome_exibicao, username_social, biografia_social,
         localizacao_estado, visibilidade)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
     try {
-        // Criptografar a senha antes de salvar no banco
-        const senhaHash = await bcrypt.hash(usuario.senha, 10)
+        const senhaHash = await bcrypt.hash(String(usuario.senha), SALT_ROUNDS)
 
-        let result = await knexConex.raw(sql, [
-            usuario.nome,
-            usuario.cpf,
+        const result = await knexConex.raw(sql, [
+            usuario.nome ?? null,
+            usuario.cpf ?? null,
             usuario.email,
-            usuario.username,
+            usuario.username ?? null,
             senhaHash,
-            usuario.xp_usuario,
-            usuario.nivel_total,
-            usuario.foto_perfil,
-            usuario.nome_exibicao,
-            usuario.username_social,
-            usuario.biografia_social,
-            usuario.localizacao_estado,
-            usuario.visibilidade
+            usuario.xp_usuario ?? 0,
+            usuario.nivel_total ?? 1,
+            usuario.foto_perfil ?? null,
+            usuario.nome_exibicao ?? null,
+            usuario.username_social ?? null,
+            usuario.biografia_social ?? null,
+            usuario.localizacao_estado ?? null,
+            usuario.visibilidade ?? null
         ])
 
-        if (result) return result[0].insertId
+        return result?.[0]?.insertId || false
     } catch (error) {
         console.error('Erro ao criar usuário:', error)
         return false
     }
 }
 
-// Atualizar usuário
+// Atualizar usuário (somente os campos enviados)
 const UpdateUsers = async (usuario) => {
-    let sqlSenha = `update tbl_usuario
-    set senha = ?
-    where id = ?`
-
     try {
-        // Atualizar a senha separadamente, caso ela tenha sido enviada
-        if (usuario.senha !== undefined) {
-            const senhaHash = await bcrypt.hash(usuario.senha, 10)
-
-            let resultSenha = await knexConex.raw(sqlSenha, [senhaHash, usuario.id_usuario])
-
-            if (resultSenha[0].affectedRows === 0) {
-                return false
-            }
-        }
-
-        // Atualizar os demais campos enviados
         const campos = {
             nome: usuario.nome,
-            cpf: usuario.cpf,
             email: usuario.email,
             username: usuario.username,
             xp_usuario: usuario.xp_usuario,
@@ -101,6 +62,11 @@ const UpdateUsers = async (usuario) => {
             biografia_social: usuario.biografia_social ?? usuario.biografia,
             localizacao_estado: usuario.localizacao_estado,
             visibilidade: usuario.visibilidade
+        }
+
+        // Senha em texto puro entra aqui e é hasheada uma única vez
+        if (usuario.senha !== undefined && usuario.senha !== '') {
+            campos.senha = await bcrypt.hash(String(usuario.senha), SALT_ROUNDS)
         }
 
         const atualizacoes = []
@@ -114,33 +80,30 @@ const UpdateUsers = async (usuario) => {
         })
 
         if (atualizacoes.length === 0) {
-            return usuario.senha !== undefined
+            return false
         }
 
-        let sql = `update tbl_usuario
-            set ${atualizacoes.join(', ')}
-            where id = ?`
-
+        // Nomes das colunas vêm do objeto fixo acima, nunca do cliente
+        const sql = `update tbl_usuario set ${atualizacoes.join(', ')} where id = ?`
         valores.push(usuario.id_usuario)
 
-        let result = await knexConex.raw(sql, valores)
+        const result = await knexConex.raw(sql, valores)
 
-        if (result) return result[0].affectedRows > 0
+        const afetados = result?.[0]?.affectedRows ?? result?.rowCount ?? 0
+        return afetados > 0
     } catch (error) {
-        console.error('Erro ao atualizar usuário:', error)
+        console.error('Erro ao atualizar dados do usuário:', error)
         return false
     }
 }
 
 // Deletar usuário
 const DeleteUsers = async (id_usuario) => {
-    let sql = `delete from tbl_usuario
-        where id = ?`
+    const sql = `delete from tbl_usuario where id = ?`
 
     try {
-        let result = await knexConex.raw(sql, [id_usuario])
-
-        if (result) return result[0].affectedRows > 0
+        const result = await knexConex.raw(sql, [id_usuario])
+        return result?.[0]?.affectedRows > 0
     } catch (error) {
         console.error('Erro ao deletar usuário:', error)
         return false
@@ -149,30 +112,27 @@ const DeleteUsers = async (id_usuario) => {
 
 // Buscar usuário pelo username
 const GetUsuarioByUsername = async (username) => {
-    let sql = `select * from tbl_usuario
-        where username = ?`
+    const sql = `select * from tbl_usuario where username = ?`
 
     try {
-        let result = await knexConex.raw(sql, [username])
-
-        if (result) return result[0][0] || null
+        const result = await knexConex.raw(sql, [username])
+        return result?.[0]?.[0] || null
     } catch (error) {
         console.error('Erro ao buscar usuário por username:', error)
-        return false
+        return null
     }
 }
 
-// Buscar todos os usuários
+// Buscar todos os usuários (sem a senha)
 const GetAllUsers = async () => {
-    let sql = `select id, nome, cpf, email, username, xp_usuario,
+    const sql = `select id, nome, cpf, email, username, xp_usuario,
         nivel_total, foto_perfil, nome_exibicao, username_social,
         biografia_social, localizacao_estado, visibilidade
         from tbl_usuario`
 
     try {
-        let result = await knexConex.raw(sql)
-
-        if (result) return result[0]
+        const result = await knexConex.raw(sql)
+        return result?.[0] || []
     } catch (error) {
         console.error('Erro ao buscar todos os usuários:', error)
         return false
@@ -181,48 +141,73 @@ const GetAllUsers = async () => {
 
 // Verificar se email, CPF ou username já existem
 const ValidarUser = async (usuario) => {
+    const condicoes = []
+    const valores = []
+
+    if (usuario.email) {
+        condicoes.push('email = ?')
+        valores.push(usuario.email)
+    }
+
+    if (usuario.cpf) {
+        condicoes.push('cpf = ?')
+        valores.push(usuario.cpf)
+    }
+
+    if (usuario.username) {
+        condicoes.push('username = ?')
+        valores.push(usuario.username)
+    }
+
+    if (condicoes.length === 0) {
+        return false
+    }
+
+    const sql = `select id from tbl_usuario where ${condicoes.join(' or ')}`
+
     try {
-        const condicoes = []
-        const valores = []
-
-        if (usuario.email) {
-            condicoes.push('email = ?')
-            valores.push(usuario.email)
-        }
-
-        if (usuario.cpf) {
-            condicoes.push('cpf = ?')
-            valores.push(usuario.cpf)
-        }
-
-        if (usuario.username) {
-            condicoes.push('username = ?')
-            valores.push(usuario.username)
-        }
-
-        if (condicoes.length === 0) {
-            return false
-        }
-
-        let sql = `select id from tbl_usuario
-            where ${condicoes.join(' or ')}`
-
-        let result = await knexConex.raw(sql, valores)
-
-        if (result) return result[0].length > 0
+        const result = await knexConex.raw(sql, valores)
+        return result[0].length > 0
     } catch (error) {
         console.error('Erro ao validar usuário:', error)
-        return false
+        // Propaga: retornar false significaria "não existe duplicado"
+        throw error
     }
 }
 
 // Validar senha no login
 const ValidarSenha = async (senhaDigitada, senhaHash) => {
     try {
-        return await bcrypt.compare(senhaDigitada, senhaHash)
+        return await bcrypt.compare(String(senhaDigitada), senhaHash)
     } catch (error) {
         console.error('Erro ao validar senha:', error)
         return false
+    }
+}
+
+// Buscar usuário pelo ID
+const GetUsuarioById = async (id_usuario) => {
+    const sql = `select * from tbl_usuario where id = ?`
+
+    try {
+        const result = await knexConex.raw(sql, [id_usuario])
+        return result?.[0]?.[0] || null
+    } catch (error) {
+        console.error('Erro ao buscar usuário por ID:', error)
+        return null
+    }
+}
+
+// Buscar usuário pelo email
+const GetUsuarioByEmail = async (email) => {
+    const sql = `select * from tbl_usuario where email = ?`
+
+    try {
+        const result = await knexConex.raw(sql, [email])
+        return result?.[0]?.[0] || null
+    } catch (error) {
+        console.error('Erro ao buscar usuário por email:', error)
+        return null
     }
 }
 
