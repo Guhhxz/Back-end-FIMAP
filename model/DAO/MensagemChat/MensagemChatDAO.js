@@ -1,5 +1,6 @@
 const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
+const geoapifyPlacesService = require('../../../src/services/geoapifyPlacesService.js')
 
 const db = knex(knexConfig.development)
 const PAPEL_USUARIO = 1
@@ -56,6 +57,22 @@ const extrairTrechoCloudflare = (dados) => {
 }
 
 const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceberTrecho) => {
+    const respostaLugares = await geoapifyPlacesService.respostaLugares(conteudo)
+    if (respostaLugares) {
+        aoReceberTrecho(respostaLugares)
+        const [idAssistente] = await db('tbl_mensagem').insert({
+            conteudo: respostaLugares,
+            data_envio: new Date(),
+            papel: PAPEL_ASSISTENTE,
+            id_chat: chatId
+        })
+        const linha = await db('tbl_mensagem')
+            .select('id', 'conteudo', 'data_envio', 'papel', 'id_chat')
+            .where({ id: idAssistente })
+            .first()
+        return formatarMensagem(linha)
+    }
+
     const workerUrl = process.env.CLOUDFLARE_WORKER_URL || 'http://127.0.0.1:8787/chat'
     const token = process.env.CLOUDFLARE_CHAT_TOKEN
     if (!token)

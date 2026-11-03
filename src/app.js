@@ -11,6 +11,7 @@ const path = require("path")
 const openFinanceRoutes = require("./routes/openFinanceRoutes")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
+const metasRoutes = require('./routes/metasRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 
@@ -61,6 +62,7 @@ app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagem
 
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
+app.use("/v1/metas", metasRoutes)
 
 const PORT = process.env.PORT || 8080
 
