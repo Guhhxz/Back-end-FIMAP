@@ -475,6 +475,7 @@ const buscarUsuarioPorEmail = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { username, email, senha, dispositivo} = req.body || {}
+
         const loginInformado = (username || email ).trim()
 
         if (!loginInformado || !senha) {
@@ -485,6 +486,8 @@ const login = async (req, res) => {
         const usuario = loginInformado.includes('@')
             ? await usuarioModel.GetUsuarioByEmail(loginInformado)
             : await usuarioModel.GetUsuarioByUsername(loginInformado)
+
+        const id_usuario = usuario.id
 
         const senhaCorreta = usuario
             ? await usuarioModel.ValidarSenha(senha, usuario.senha)
@@ -503,17 +506,28 @@ const login = async (req, res) => {
             return responderErro(res, config_message.SENHA_INVALIDA)
         }
 
-         id_dispositivo = await dispositivoModel.CreateDispositivo({
-            ...dispositivo,
+        // Verificar se o dispositivo já existe para este usuário
+        const dispositivoExiste = await dispositivoModel.ValidarDispositivo({
+            identificador: dispositivo.identificador,
             id_usuario
         })
 
-        if (!id_dispositivo) {
-            await desfazerCadastro(id_usuario, null)
-            return res.status(500).json({
-                sucesso: false,
-                mensagem: 'Erro ao cadastrar o dispositivo.'
+        let id_dispositivo
+
+        // Só criar o dispositivo se ele ainda não existir
+        if (!dispositivoExiste) {
+            id_dispositivo = await dispositivoModel.CreateDispositivo({
+                ...dispositivo,
+                id_usuario
             })
+
+            if (!id_dispositivo) {
+                await desfazerCadastro(id_usuario, null)
+                return res.status(500).json({
+                    sucesso: false,
+                    mensagem: 'Erro ao cadastrar o dispositivo.'
+                })
+            }
         }
 
 
