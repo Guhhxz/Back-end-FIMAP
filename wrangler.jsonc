@@ -1,6 +1,6 @@
 ﻿{
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "meu-chatbot-financeiro",
+  "name": "back-end-fimap",
   "workers_dev": true,
   "preview_urls": false,
   "main": "src/index.ts",
