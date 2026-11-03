@@ -195,13 +195,14 @@
   </footer>
 
   <script>
-    const parametros = new URLSearchParams(window.location.search)
-    const chatId = parametros.get('chatId') || '1'
+    // Para usar o front em outro domínio, defina window.FIMAP_API_URL antes deste script.
+    const API_BASE_URL = (window.FIMAP_API_URL || '').replace(/\/+$/, '')
     const formulario = document.getElementById('formulario')
     const campo = document.getElementById('mensagem')
     const conversa = document.getElementById('conversa')
     const carregando = document.getElementById('carregando')
     const botao = document.getElementById('enviar')
+    const historico = []
 
     function adicionarMensagem(papel, texto = '') {
       const bloco = document.createElement('div')
@@ -223,41 +224,48 @@
       conversa.scrollTop = conversa.scrollHeight
       return balao
     }
+
     formulario.addEventListener('submit', async (evento) => {
       evento.preventDefault()
       const conteudo = campo.value.trim()
       if (!conteudo) return
 
       adicionarMensagem('user', conteudo)
+      historico.push({ role: 'user', content: conteudo })
       const balaoAssistente = adicionarMensagem('assistant')
       campo.value = ''
       carregando.textContent = 'Pensando…'
       botao.disabled = true
-      let recebeuTrecho = false
+      let textoResposta = ''
 
       try {
-        const resposta = await fetch(`http://localhost:8080/v1/ia/chats/${encodeURIComponent(chatId)}/mensagens`, {
+        const resposta = await fetch(`${API_BASE_URL}/v1/ia/chat-publico`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conteudo })
+          body: JSON.stringify({ messages: historico.slice(-10) })
         })
-        if (!resposta.ok || !resposta.body) throw new Error('Não foi possível conectar ao servidor.')
+        if (!resposta.ok) {
+          const erro = await resposta.json().catch(() => ({}))
+          throw new Error(erro.mensagem || `O servidor respondeu com status ${resposta.status}.`)
+        }
+        if (!resposta.body) throw new Error('O servidor não iniciou o fluxo de resposta.')
+
         const reader = resposta.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
         while (true) {
           const { value, done } = await reader.read()
           buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
-          const eventos = buffer.split('\n\n')
+          const eventos = buffer.split(/\r?\n\r?\n/)
           buffer = eventos.pop() || ''
-          for (const linhaEvento of eventos) {
-            const linha = linhaEvento.split('\n').find((item) => item.startsWith('data: '))
+          for (const eventoSse of eventos) {
+            const linha = eventoSse.split(/\r?\n/).find((item) => item.startsWith('data: '))
             if (!linha) continue
             const dados = JSON.parse(linha.slice(6))
             if (dados.tipo === 'trecho') {
-              recebeuTrecho = true
+              textoResposta += dados.conteudo
+              balaoAssistente.textContent = textoResposta
               carregando.textContent = ''
-              balaoAssistente.textContent += dados.conteudo
               conversa.scrollTop = conversa.scrollHeight
             } else if (dados.tipo === 'erro') {
               throw new Error(dados.mensagem || 'A assistente não conseguiu responder.')
@@ -265,15 +273,15 @@
           }
           if (done) break
         }
-        if (!recebeuTrecho) {
-          balaoAssistente.classList.add('error')
-          balaoAssistente.textContent = 'Não recebi uma resposta. Tente enviar sua mensagem novamente.'
-        }
+        if (!textoResposta) throw new Error('A IA não retornou uma resposta. Tente novamente.')
+        historico.push({ role: 'assistant', content: textoResposta })
+        if (historico.length > 10) historico.splice(0, historico.length - 10)
       } catch (erro) {
         balaoAssistente.classList.add('error')
-        balaoAssistente.textContent = recebeuTrecho
-          ? `${balaoAssistente.textContent}\n\nA resposta foi interrompida. Tente novamente.`
+        balaoAssistente.textContent = textoResposta
+          ? `${textoResposta}\n\nA resposta foi interrompida. Tente novamente.`
           : `Não consegui responder agora. ${erro.message}`
+        if (!textoResposta) historico.pop()
       } finally {
         carregando.textContent = ''
         botao.disabled = false
@@ -283,5 +291,4 @@
   </script>
 </body>
 </html>
-
 

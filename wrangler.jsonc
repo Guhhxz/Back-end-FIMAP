@@ -1,9 +1,17 @@
 ﻿{
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "meu-chatbot-financeiro",
+  "workers_dev": true,
+  "preview_urls": false,
   "main": "src/index.ts",
   "compatibility_date": "2026-10-21",
-  "ai": {
-    "binding": "AI"
-  }
+  "ai": { "binding": "AI" },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/v1/ia/*", "/chat", "/health"]
+  },
+  "ratelimits": [
+    { "name": "CHAT_RATE_LIMITER", "namespace_id": "73918426", "simple": { "limit": 12, "period": 60 } }
+  ]
 }
