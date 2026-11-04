@@ -8,10 +8,12 @@ const { enviarOTP } = require('../../config/email.js')
 const OTP_VALIDADE_MS = 5 * 60 * 1000
 const SENHA_MIN_CARACTERES = 8
 
-// Campos que o próprio usuário pode editar (xp, nível, e-mail e senha ficam de fora)
+// Campos que o próprio usuário pode editar (xp, nível e e-mail ficam de fora).
+// A senha pode ser editada, mas exige um código OTP válido (ver atualizarUsuario).
 const CAMPOS_EDITAVEIS = [
     'nome',
     'username',
+    'senha',
     'foto_perfil',
     'nome_exibicao',
     'username_social',
@@ -34,10 +36,30 @@ const idValido = (id) => Number.isInteger(id) && id > 0
 const responderErro = (res, cfg) =>
     res.status(cfg.status).json({ sucesso: false, mensagem: cfg.mensagem })
 
+// Resposta de erro de senha curta
+const responderSenhaCurta = (res) =>
+    res.status(400).json({
+        sucesso: false,
+        mensagem: `A senha deve ter pelo menos ${SENHA_MIN_CARACTERES} caracteres.`
+    })
+
+// Resposta de código OTP inválido
+const responderOTPInvalido = (res) =>
+    res.status(400).json({
+        sucesso: false,
+        mensagem: 'Código inválido ou expirado.'
+    })
+
 // Remove a senha do objeto de usuário antes de enviar na resposta
 const semSenha = ({ senha, ...resto }) => resto
 
-// Valida e normaliza os dados do dispositivo enviados no cadastro
+// Remove o valor do código OTP antes de enviar na resposta
+const semCodigo = ({ codigo, ...resto }) => resto
+
+// O DAO pode devolver o id como "id" ou "id_usuario"; aceita os dois
+const idDoUsuario = (usuario) => usuario.id ?? usuario.id_usuario
+
+// Valida e normaliza os dados do dispositivo enviados no login
 const montarDispositivo = (dados) => {
     const { nome, sistema_operacional, identificador } = dados || {}
 
@@ -53,30 +75,46 @@ const montarDispositivo = (dados) => {
 }
 
 // Rollback do cadastro (NÃO é handler Express). Nunca lança erro.
-// Apaga o dispositivo primeiro (ele depende do usuário) e depois o usuário.
-const desfazerCadastro = async (id_usuario, id_dispositivo) => {
-    if (id_dispositivo) {
-        try {
-            await dispositivoModel.DeletarDispositivo(id_dispositivo)
-        } catch (erro) {
-            console.error('Erro no rollback do dispositivo:', erro)
-        }
-    }
+const desfazerCadastro = async (id_usuario) => {
+    if (!id_usuario) return
 
-    if (id_usuario) {
-        try {
-            await usuarioModel.DeleteUsers(id_usuario)
-        } catch (erro) {
-            console.error('Erro no rollback do usuário:', erro)
-        }
+    try {
+        await usuarioModel.DeleteUsers(id_usuario)
+    } catch (erro) {
+        console.error('Erro no rollback do usuário:', erro)
     }
 }
 
-// Cria o usuário, o dispositivo, o OTP, e envia por e-mail.
-// Se qualquer etapa falhar, tudo que foi criado é apagado.
+// Garante que o dispositivo está registrado para o usuário, sem duplicar.
+// Retorna true se já existia ou foi criado agora; false se não foi possível.
+const garantirDispositivo = async (id_usuario, aparelho) => {
+    const existente = await dispositivoModel.GetDispositivoByIdentificador(
+        id_usuario,
+        aparelho.identificador
+    )
+
+    if (existente) return true
+
+    const id_dispositivo = await dispositivoModel.CreateDispositivo({
+        ...aparelho,
+        id_usuario
+    })
+
+    if (id_dispositivo) return true
+
+    // Pode ter sido uma corrida (outro login criou o mesmo dispositivo agora há pouco)
+    const criadoPorOutraRequisicao = await dispositivoModel.GetDispositivoByIdentificador(
+        id_usuario,
+        aparelho.identificador
+    )
+
+    return Boolean(criadoPorOutraRequisicao)
+}
+
+// Cria o usuário, o OTP, e envia por e-mail.
+// Se qualquer etapa falhar, o usuário criado é apagado.
 const criarCodigoOTPUsuario = async (req, res) => {
     let id_usuario = null
-    let id_dispositivo = null
 
     try {
         const usuario = req.body
@@ -86,10 +124,7 @@ const criarCodigoOTPUsuario = async (req, res) => {
         }
 
         if (!senhaValida(usuario.senha)) {
-            return res.status(400).json({
-                sucesso: false,
-                mensagem: `A senha deve ter pelo menos ${SENHA_MIN_CARACTERES} caracteres.`
-            })
+            return responderSenhaCurta(res)
         }
 
         const usuarioExiste = await usuarioModel.ValidarUser(usuario)
@@ -105,9 +140,7 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
         }
 
-        // 2. cria o dispositivo ligado ao usuário
-     
-        // 3. cria o código ligado ao usuário
+        // 2. cria o código ligado ao usuário
         const codigo = gerarCodigo()
 
         const id_codigo_otp = await codigoOTPModel.CreateCodigoOTP({
@@ -117,28 +150,27 @@ const criarCodigoOTPUsuario = async (req, res) => {
         })
 
         if (!id_codigo_otp) {
-            await desfazerCadastro(id_usuario, id_dispositivo)
+            await desfazerCadastro(id_usuario)
             return responderErro(res, config_message.ERRO_GERAR_OTP)
         }
 
-        // 4. envia o e-mail; se falhar, apaga tudo
+        // 3. envia o e-mail; se falhar, apaga tudo
         try {
             await enviarOTP(usuario.email, codigo)
         } catch (erroEmail) {
             console.error('Erro ao enviar OTP:', erroEmail)
-            await desfazerCadastro(id_usuario, id_dispositivo)
+            await desfazerCadastro(id_usuario)
             return responderErro(res, config_message.ERRO_ENVIAR_OTP)
         }
 
         return res.status(config_message.USUARIO_CRIADO.status).json({
             sucesso: true,
             mensagem: 'Usuário criado. Verifique seu e-mail para obter o código OTP.',
-            id_usuario,
-            id_dispositivo
+            id_usuario
         })
     } catch (error) {
         console.error('Erro ao criar usuário:', error)
-        await desfazerCadastro(id_usuario, id_dispositivo)
+        await desfazerCadastro(id_usuario)
         return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
     }
 }
@@ -160,10 +192,7 @@ const verificarOTPCadastro = async (req, res) => {
         const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
 
         if (!otp) {
-            return res.status(400).json({
-                sucesso: false,
-                mensagem: 'Código inválido ou expirado.'
-            })
+            return responderOTPInvalido(res)
         }
 
         await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
@@ -179,7 +208,8 @@ const verificarOTPCadastro = async (req, res) => {
 }
 
 // Atualizar usuário (dados gerais).
-// Só campos da lista branca; a senha só muda pelo fluxo com OTP.
+// Só campos da lista branca. Se vier "senha", exige "codigo" (OTP) válido:
+// o código é consumido e o DAO faz o hash da senha uma única vez.
 const atualizarUsuario = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
@@ -196,15 +226,25 @@ const atualizarUsuario = async (req, res) => {
             return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
         }
 
+        const trocandoSenha = dados.senha !== undefined
+
+        // Troca de senha exige tamanho mínimo e código OTP válido
+        if (trocandoSenha) {
+            if (!senhaValida(dados.senha)) {
+                return responderSenhaCurta(res)
+            }
+        }
+
         // Se for trocar o username, garante que não pertence a outro usuário
         if (dados.username) {
             const existente = await usuarioModel.GetUsuarioByUsername(dados.username)
 
-            if (existente && existente.id !== id_usuario) {
+            if (existente && idDoUsuario(existente) !== id_usuario) {
                 return responderErro(res, config_message.DADOS_USUARIO_EXISTENTES)
             }
         }
 
+        // Senha em texto puro: o DAO faz o hash
         const atualizado = await usuarioModel.UpdateUsers({ ...dados, id_usuario })
 
         if (!atualizado) {
@@ -265,59 +305,34 @@ const solicitarOTPAlteracaoSenha = async (req, res) => {
     }
 }
 
-// PASSO 2 da troca de senha: valida o OTP e só então altera a senha
-const alterarSenhaComOTP = async (req, res) => {
+// PASSO 2 da troca de senha: só confere o código, SEM consumir.
+// O código é consumido no PASSO 3 (atualizarUsuario, ao enviar "senha" + "codigo").
+const verificarCodigoAlteracaoSenha = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
-        const { codigo, nova_senha } = req.body || {}
+        const { codigo } = req.body || {}
 
         if (!idValido(id_usuario)) {
             return responderErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        if (!codigo || !nova_senha) {
+        if (!codigo) {
             return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
-        }
-
-        if (!senhaValida(nova_senha)) {
-            return res.status(400).json({
-                sucesso: false,
-                mensagem: `A senha deve ter pelo menos ${SENHA_MIN_CARACTERES} caracteres.`
-            })
-        }
-
-        const usuario = await usuarioModel.GetUsuarioById(id_usuario)
-
-        if (!usuario) {
-            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
         }
 
         const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
 
         if (!otp) {
-            return res.status(400).json({
-                sucesso: false,
-                mensagem: 'Código inválido ou expirado.'
-            })
+            return responderOTPInvalido(res)
         }
 
-        // Invalida o código ANTES de trocar a senha, para não permitir reuso
-        await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
-
-        // Senha em texto puro: o DAO faz o hash
-        const atualizado = await usuarioModel.UpdateUsers({ id_usuario, senha: nova_senha })
-
-        if (!atualizado) {
-            return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
-        }
-
-        return res.status(config_message.USUARIO_ATUALIZADO.status).json({
+        return res.status(200).json({
             sucesso: true,
-            mensagem: config_message.USUARIO_ATUALIZADO.mensagem
+            mensagem: 'Código válido.'
         })
     } catch (error) {
-        console.error('Erro ao alterar senha:', error)
-        return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
+        console.error('Erro ao verificar código:', error)
+        return responderErro(res, config_message.ERRO_GERAR_OTP)
     }
 }
 
@@ -404,11 +419,13 @@ const buscarTodosCodigos = async (req, res) => {
             return responderErro(res, config_message.ERRO_BUSCAR_USUARIOS)
         }
 
+        const codigosSemValor = codigos.map(semCodigo)
+
         return res.status(config_message.USUARIOS_ENCONTRADOS.status).json({
             sucesso: true,
             mensagem: config_message.USUARIOS_ENCONTRADOS.mensagem,
-            quantidade: codigos.length,
-            codigos
+            quantidade: codigosSemValor.length,
+            codigos: codigosSemValor
         })
     } catch (error) {
         console.error('Erro ao buscar códigos OTP:', error)
@@ -471,15 +488,23 @@ const buscarUsuarioPorEmail = async (req, res) => {
     }
 }
 
-// Login
+// Login: valida credenciais e registra o dispositivo (sem duplicar)
 const login = async (req, res) => {
     try {
-        const { username, email, senha, dispositivo} = req.body || {}
-
-        const loginInformado = (username || email ).trim()
+        const { username, email, senha, dispositivo } = req.body || {}
+        const loginInformado = String(username || email || '').trim()
 
         if (!loginInformado || !senha) {
             return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
+        }
+
+        const aparelho = montarDispositivo(dispositivo)
+
+        if (!aparelho) {
+            return res.status(400).json({
+                sucesso: false,
+                mensagem: 'Dados do dispositivo obrigatórios (nome, sistema_operacional e identificador).'
+            })
         }
 
         // "@" indica e-mail, senão é username
@@ -487,49 +512,24 @@ const login = async (req, res) => {
             ? await usuarioModel.GetUsuarioByEmail(loginInformado)
             : await usuarioModel.GetUsuarioByUsername(loginInformado)
 
-        const id_usuario = usuario.id
-
         const senhaCorreta = usuario
             ? await usuarioModel.ValidarSenha(senha, usuario.senha)
             : false
 
-         const aparelho = montarDispositivo(dispositivo)
-
-            if (!dispositivo) {
-                return res.status(400).json({
-                    sucesso: false,
-                    mensagem: 'Dados do dispositivo obrigatórios (nome, sistema_operacional e identificador).'
-                })
-            }
-
+        // Mesma resposta para usuário inexistente e senha errada
         if (!senhaCorreta) {
             return responderErro(res, config_message.SENHA_INVALIDA)
         }
 
-        // Verificar se o dispositivo já existe para este usuário
-        const dispositivoExiste = await dispositivoModel.ValidarDispositivo({
-            identificador: dispositivo.identificador,
-            id_usuario
-        })
+        // Só cadastra o dispositivo se ainda não existir. Falha aqui NUNCA apaga o usuário.
+        const dispositivoOk = await garantirDispositivo(idDoUsuario(usuario), aparelho)
 
-        let id_dispositivo
-
-        // Só criar o dispositivo se ele ainda não existir
-        if (!dispositivoExiste) {
-            id_dispositivo = await dispositivoModel.CreateDispositivo({
-                ...dispositivo,
-                id_usuario
+        if (!dispositivoOk) {
+            return res.status(500).json({
+                sucesso: false,
+                mensagem: 'Erro ao cadastrar o dispositivo.'
             })
-
-            if (!id_dispositivo) {
-                await desfazerCadastro(id_usuario, null)
-                return res.status(500).json({
-                    sucesso: false,
-                    mensagem: 'Erro ao cadastrar o dispositivo.'
-                })
-            }
         }
-
 
         return res.status(config_message.LOGIN_SUCESSO.status).json({
             sucesso: true,
@@ -555,10 +555,7 @@ const validarCodigoOTP = async (req, res) => {
         const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
 
         if (!otp) {
-            return res.status(400).json({
-                sucesso: false,
-                mensagem: 'Código inválido ou expirado.'
-            })
+            return responderOTPInvalido(res)
         }
 
         await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
@@ -578,7 +575,7 @@ module.exports = {
     verificarOTPCadastro,
     atualizarUsuario,
     solicitarOTPAlteracaoSenha,
-    alterarSenhaComOTP,
+    verificarCodigoAlteracaoSenha,
     deletarUsuario,
     buscarUsuarioPorUsername,
     buscarTodosUsuarios,
