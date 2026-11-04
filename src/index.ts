@@ -86,7 +86,7 @@ export default {
 
     const mensagens = rotaChatPublico ? [{ role: "system", content: systemPrompt }, ...body.messages] : body.messages;
     try {
-      const stream = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+      const stream = await env.AI.run("@cf/google/gemma-4-26b-a4b-it", {
         messages: mensagens as Array<{ role: "system" | "user" | "assistant"; content: string }>,
         stream: true,
         temperature: 0.6,
