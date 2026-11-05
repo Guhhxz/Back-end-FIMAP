@@ -40,3 +40,11 @@ O endpoint persistente também propaga cancelamento. A pergunta já gravada perm
 ## Validação
 
 Na raiz, `npm test` cobre cancelamento do serviço, do controller e do Worker, além do fluxo SSE concluído. `npx wrangler deploy --dry-run` verifica o bundle sem publicar.
+
+## Comportamento da IA
+
+Edite `src/ai-system-prompt.js` para mudar a identidade, o tom e as regras da assistente. O texto entre as crases aceita várias linhas e pode ser ampliado com novas seções. Esse arquivo é compartilhado pelo Worker, pelo chat público Express e pelo chat com histórico. As orientações visuais continuam em `src/ai-presentation-prompt.js`, acrescentadas nos fluxos públicos.
+
+O prompt é enviado a cada requisição e compartilha a janela de contexto do modelo com o histórico e a resposta. Um texto maior consome mais tokens; o arquivo não remove os limites do modelo. Não coloque segredos no prompt. Após editar, reinicie o backend e publique novamente o Worker.
+
+O prompt de comportamento contém as 30 seções do FIMAP e uma seção inicial de aplicação: exemplos são hipotéticos, ferramentas dependem de habilitação real, o contexto é apenas o recebido e as respostas não executam operações financeiras. Na rota legada `/chat`, somente as versões exatas do prompt compartilhado (com ou sem o contrato de apresentação) podem ultrapassar o limite comum de 2.000 caracteres para mensagens de sistema. Isso exige manter backend e Worker com a mesma versão do prompt.

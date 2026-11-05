@@ -1,4 +1,5 @@
 const { WORKER_URL_PADRAO } = require('../../../src/config/ia.js')
+const systemPrompt = require('../../../src/ai-system-prompt.js')
 const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const geoapifyPlacesService = require('../../../src/services/geoapifyPlacesService.js')
@@ -85,13 +86,12 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
         .where({ id_chat: chatId })
         .where('id', '<', idUsuario)
         .orderBy('id', 'desc')
-        .limit(1)
+        .limit(10)
 
     const mensagens = [
         {
             role: 'system',
-            content:
-                'Você é uma assistente financeira pessoal, acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não ofereça ajuda com programação, a menos que a pessoa peça explicitamente. Não invente dados; pergunte quando faltarem informações.'
+            content: systemPrompt
         }
     ]
     mensagens.push(

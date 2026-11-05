@@ -2,7 +2,7 @@ const iaService = require('../../services/publicChatService.js')
 
 const geoapifyPlacesService = require('../../services/geoapifyPlacesService.js')
 const presentationPrompt = require('../../ai-presentation-prompt.js')
-const systemPrompt = 'Você é uma assistente financeira pessoal acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não invente dados financeiros; pergunte quando faltarem informações. Suas respostas são informativas e não executam operações financeiras.'
+const systemPrompt = require('../../ai-system-prompt.js')
 const enviarEvento = (res, dados) => !res.destroyed && !res.writableEnded && res.write(`data: ${JSON.stringify(dados)}\n\n`)
 
 const conversarPublicamente = async (req, res) => {

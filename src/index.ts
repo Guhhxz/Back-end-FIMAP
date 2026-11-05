@@ -1,9 +1,14 @@
 import presentationPrompt from "./ai-presentation-prompt.js";
-export type Env = Cloudflare.Env;
+import systemPrompt from "./ai-system-prompt.js";
+import financialChat from "./services/financial/financialChatOrchestrator.js";
+export type Env = Cloudflare.Env & {
+  HG_BRASIL_API_KEY?: string;
+  BRAPI_TOKEN?: string;
+  FINANCIAL_TOOLS_ENABLED?: string;
+};
 
 const ultimaPerguntaPorIp = new Map<string, number>();
 let ultimaLimpeza = Date.now();
-const systemPrompt = "Você é uma assistente financeira pessoal acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não invente dados financeiros; pergunte quando faltarem informações. Suas respostas são informativas e não executam operações financeiras.";
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { ...corsHeaders, "Cache-Control": "no-store" } });
 
@@ -88,14 +93,25 @@ export default {
       if (!item || typeof item !== "object") return false;
       const mensagem = item as { role?: unknown; content?: unknown };
       const papeisPermitidos = rotaLegada ? ["system", "user", "assistant"] : ["user", "assistant"];
-      return papeisPermitidos.includes(String(mensagem.role)) && typeof mensagem.content === "string" && mensagem.content.trim().length > 0 && mensagem.content.length <= (mensagem.role === "assistant" ? 16000 : 2000);
+      // O backend envia o prompt compartilhado completo na rota legada.
+      // Apenas essas versões conhecidas podem ultrapassar o limite comum.
+      const promptCompartilhado = rotaLegada && mensagem.role === "system" &&
+        (mensagem.content === systemPrompt || mensagem.content === systemPrompt + "\n" + presentationPrompt);
+      return papeisPermitidos.includes(String(mensagem.role)) && typeof mensagem.content === "string" && mensagem.content.trim().length > 0 &&
+        (promptCompartilhado || mensagem.content.length <= (mensagem.role === "assistant" ? 16000 : 2000));
     });
     if (!validas) return json({ mensagem: "Mensagem inválida ou maior que 2000 caracteres." }, 400);
 
     const mensagens = rotaChatPublico ? [{ role: "system", content: systemPrompt + "\n" + presentationPrompt }, ...body.messages] : body.messages;
     try {
+      const mensagensComFerramentas = await financialChat.prepareFinancialMessages(
+        mensagens, env,
+        (inputs) => env.AI.run("@cf/google/gemma-4-26b-a4b-it", inputs),
+        { signal: request.signal, logger: (dados) => console.info(JSON.stringify(dados)) }
+      );
+      request.signal.throwIfAborted();
       const stream = await env.AI.run("@cf/google/gemma-4-26b-a4b-it", {
-        messages: mensagens as Array<{ role: "system" | "user" | "assistant"; content: string }>,
+        messages: mensagensComFerramentas as Array<{ role: "system" | "user" | "assistant"; content: string }>,
         stream: true,
         temperature: 0.6,
         chat_template_kwargs: { enable_thinking: true },
@@ -105,7 +121,7 @@ export default {
         if (ultimaPerguntaPorIp.get(ip) === agora) ultimaPerguntaPorIp.delete(ip);
       }), { headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Content-Type-Options": "nosniff" } });
     } catch (error) {
-      console.error("Workers AI falhou:", error);
+      console.error("Workers AI falhou ao gerar a resposta.");
       return json({ mensagem: "A Cloudflare não conseguiu gerar a resposta." }, 502);
     }
   },
