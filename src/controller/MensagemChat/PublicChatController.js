@@ -1,8 +1,9 @@
-﻿const iaService = require('../../services/publicChatService.js')
+const iaService = require('../../services/publicChatService.js')
 
 const geoapifyPlacesService = require('../../services/geoapifyPlacesService.js')
+const presentationPrompt = require('../../ai-presentation-prompt.js')
 const systemPrompt = 'Você é uma assistente financeira pessoal acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não invente dados financeiros; pergunte quando faltarem informações. Suas respostas são informativas e não executam operações financeiras.'
-const enviarEvento = (res, dados) => res.write(`data: ${JSON.stringify(dados)}\n\n`)
+const enviarEvento = (res, dados) => !res.destroyed && !res.writableEnded && res.write(`data: ${JSON.stringify(dados)}\n\n`)
 
 const conversarPublicamente = async (req, res) => {
     const entrada = req.body?.messages
@@ -12,7 +13,7 @@ const conversarPublicamente = async (req, res) => {
     const mensagens = entrada.map((item) => {
         if (!item || !['user', 'assistant'].includes(item.role) || typeof item.content !== 'string') return null
         const content = item.content.trim()
-        if (!content || content.length > 2000) return null
+        if (!content || content.length > (item.role === 'assistant' ? 16000 : 2000)) return null
         return { role: item.role, content }
     })
     if (mensagens.some((item) => !item) || mensagens[mensagens.length - 1].role !== 'user') {
@@ -26,22 +27,29 @@ const conversarPublicamente = async (req, res) => {
         'X-Accel-Buffering': 'no'
     })
     res.flushHeaders()
+    const controlador = new AbortController()
+    const cancelar = () => { if (!res.writableEnded) controlador.abort() }
+    res.on("close", cancelar)
     try {
         const respostaLugares = await geoapifyPlacesService.respostaLugares(mensagens[mensagens.length - 1].content)
+        controlador.signal.throwIfAborted()
         if (respostaLugares) {
             enviarEvento(res, { tipo: 'trecho', conteudo: respostaLugares })
             enviarEvento(res, { tipo: 'fim' })
-            return res.end()
+            return
         }
         await iaService.gerarResposta(
-            [{ role: 'system', content: systemPrompt }, ...mensagens.slice(-10)],
-            (trecho) => enviarEvento(res, { tipo: 'trecho', conteudo: trecho })
+            [{ role: 'system', content: systemPrompt + '\n' + presentationPrompt }, ...mensagens.slice(-10)],
+            (trecho) => enviarEvento(res, { tipo: 'trecho', conteudo: trecho }),
+            controlador.signal
         )
         enviarEvento(res, { tipo: 'fim' })
     } catch (error) {
+        if (controlador.signal.aborted) return
         console.error('Erro na conversa pública com a IA:', error.code || error.message)
         enviarEvento(res, { tipo: 'erro', mensagem: error.message || 'Não foi possível obter resposta da IA.' })
     } finally {
+        res.off("close", cancelar)
         res.end()
     }
 }

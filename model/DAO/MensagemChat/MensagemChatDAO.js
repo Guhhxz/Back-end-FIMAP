@@ -1,3 +1,4 @@
+const { WORKER_URL_PADRAO } = require('../../../src/config/ia.js')
 const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const geoapifyPlacesService = require('../../../src/services/geoapifyPlacesService.js')
@@ -56,10 +57,11 @@ const extrairTrechoCloudflare = (dados) => {
     )
 }
 
-const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceberTrecho) => {
+const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceberTrecho, signal) => {
     const respostaLugares = await geoapifyPlacesService.respostaLugares(conteudo)
     if (respostaLugares) {
         aoReceberTrecho(respostaLugares)
+        signal?.throwIfAborted()
         const [idAssistente] = await db('tbl_mensagem').insert({
             conteudo: respostaLugares,
             data_envio: new Date(),
@@ -73,7 +75,7 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
         return formatarMensagem(linha)
     }
 
-    const workerUrl = process.env.CLOUDFLARE_WORKER_URL || 'http://127.0.0.1:8787/chat'
+    const workerUrl = process.env.CLOUDFLARE_WORKER_URL || WORKER_URL_PADRAO
     const token = process.env.CLOUDFLARE_CHAT_TOKEN
     if (!token)
         throw erro(503, 'Configure CLOUDFLARE_CHAT_TOKEN no .env.', 'CLOUDFLARE_NOT_CONFIGURED')
@@ -109,9 +111,10 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
                 Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({ messages: mensagens }),
-            signal: AbortSignal.timeout(TIMEOUT_IA_MS)
+            signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_IA_MS)]) : AbortSignal.timeout(TIMEOUT_IA_MS)
         })
     } catch (cause) {
+        signal?.throwIfAborted()
         if (cause.name === 'TimeoutError' || cause.name === 'AbortError') {
             throw erro(503, 'A Cloudflare excedeu o tempo limite.', 'CLOUDFLARE_TIMEOUT')
         }
@@ -192,6 +195,7 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
             }
         }
     } catch (cause) {
+        signal?.throwIfAborted()
         if (cause.code) throw cause
         throw erro(
             502,
@@ -204,6 +208,7 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
     if (!respostaCompleta)
         throw erro(502, 'A Cloudflare retornou uma resposta vazia.', 'CLOUDFLARE_INVALID_RESPONSE')
 
+    signal?.throwIfAborted()
     const [idAssistente] = await db('tbl_mensagem').insert({
         conteudo: respostaCompleta,
         data_envio: new Date(),
@@ -217,7 +222,7 @@ const transmitirRespostaAssistente = async (chatId, conteudo, idUsuario, aoReceb
     return formatarMensagem(linha)
 }
 
-const iniciarMensagemChat = async (chatId, conteudo, aoReceberTrecho) => {
+const iniciarMensagemChat = async (chatId, conteudo, aoReceberTrecho, signal) => {
     const chat = await buscarChat(chatId)
     if (!chat) return null
 
@@ -236,7 +241,8 @@ const iniciarMensagemChat = async (chatId, conteudo, aoReceberTrecho) => {
         chatId,
         conteudo,
         idUsuario,
-        aoReceberTrecho
+        aoReceberTrecho,
+        signal
     )
     return { mensagem_usuario: mensagemUsuario, mensagem_assistente: mensagemAssistente }
 }

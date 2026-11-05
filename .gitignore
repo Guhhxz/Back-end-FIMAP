@@ -7,3 +7,6 @@ node_modules/
 !.dev.vars.example
 .env*
 !.env.example
+
+# Bibliotecas geradas apenas para a interface opcional de teste
+frontend-test/assets/vendor/

@@ -5,7 +5,6 @@ require("dotenv").config({
 
 const express = require("express")
 const cors = require("cors")
-const path = require("path")
 
 // Importando rotas e controllers
 const openFinanceRoutes = require("./routes/openFinanceRoutes")
@@ -24,10 +23,9 @@ const corsOption = {
 }
 
 app.use(cors(corsOption))
-app.use(express.json({ limit: "32kb" }))
+app.use(express.json({ limit: "192kb" }))
 app.use(express.urlencoded({ extended: true }))
 
-app.get("/", (req, res) => res.sendFile(path.resolve(__dirname, "../index.html")))
 app.get("/health", (req, res) => res.status(200).json({ online: true, servico: "fimap-api" }))
 
 // Permite uma pergunta por IP a cada cinco segundos.
@@ -50,6 +48,9 @@ const limitarUsoPublico = (req, res, next) => {
         return res.status(429).json({ mensagem: `Aguarde ${segundos} segundo(s) antes de enviar outra pergunta.` })
     }
     ultimaPerguntaPorIp.set(ip, agora)
+    res.once('close', () => {
+        if (!res.writableEnded && ultimaPerguntaPorIp.get(ip) === agora) ultimaPerguntaPorIp.delete(ip)
+    })
     return next()
 }
 

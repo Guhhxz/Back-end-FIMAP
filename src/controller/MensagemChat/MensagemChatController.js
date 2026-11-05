@@ -45,10 +45,13 @@ const enviarMensagemChat = async (req, res) => {
         'X-Accel-Buffering': 'no'
     })
     res.flushHeaders()
-    const evento = (dados) => res.write(`data: ${JSON.stringify(dados)}\n\n`)
+    const controlador = new AbortController()
+    const cancelar = () => { if (!res.writableEnded) controlador.abort() }
+    res.on('close', cancelar)
+    const evento = (dados) => !res.destroyed && !res.writableEnded && res.write(`data: ${JSON.stringify(dados)}\n\n`)
     try {
         const resultado = await mensagemChatDAO.iniciarMensagemChat(chatId, conteudo, (trecho) =>
-            evento({ tipo: 'trecho', conteudo: trecho })
+            evento({ tipo: 'trecho', conteudo: trecho }), controlador.signal
         )
         if (!resultado)
             evento({
@@ -62,6 +65,7 @@ const enviarMensagemChat = async (req, res) => {
                 mensagem_assistente: resultado.mensagem_assistente
             })
     } catch (error) {
+        if (controlador.signal.aborted) return
         console.error('Erro ao enviar mensagem para a Cloudflare:', error)
         const mensagens = {
             CLOUDFLARE_NOT_CONFIGURED: 'Configure CLOUDFLARE_CHAT_TOKEN no arquivo .env.',
@@ -80,6 +84,7 @@ const enviarMensagemChat = async (req, res) => {
                 mensagens[error.code] || error.message || 'Não foi possível obter resposta da IA.'
         })
     } finally {
+        res.off('close', cancelar)
         res.end()
     }
 }

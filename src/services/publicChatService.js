@@ -1,5 +1,5 @@
-﻿const TIMEOUT_IA_MS = 180000
-const WORKER_URL_PADRAO = 'https://meu-chatbot-financeiro.pedroday813.workers.dev/chat'
+const TIMEOUT_IA_MS = 180000
+const { WORKER_URL_PADRAO } = require('../config/ia.js')
 
 const criarErro = (message, code) => Object.assign(new Error(message), { code })
 const isConfigurado = () => Boolean(process.env.CLOUDFLARE_WORKER_URL || WORKER_URL_PADRAO)
@@ -9,7 +9,7 @@ const extrairConteudo = (dados) => {
     return dados?.response || dados?.choices?.[0]?.delta?.content || dados?.choices?.[0]?.message?.content || ''
 }
 
-const gerarResposta = async (mensagens, aoReceberTrecho) => {
+const gerarResposta = async (mensagens, aoReceberTrecho, signal) => {
     const url = process.env.CLOUDFLARE_WORKER_URL || WORKER_URL_PADRAO
     let resposta
     try {
@@ -17,9 +17,10 @@ const gerarResposta = async (mensagens, aoReceberTrecho) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ messages: mensagens }),
-            signal: AbortSignal.timeout(TIMEOUT_IA_MS)
+            signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_IA_MS)]) : AbortSignal.timeout(TIMEOUT_IA_MS)
         })
     } catch (error) {
+        signal?.throwIfAborted()
         throw criarErro(error.name === 'TimeoutError' ? 'A IA demorou demais para responder.' : 'Não foi possível conectar à IA na nuvem.', 'IA_INDISPONIVEL')
     }
     if (!resposta.ok) {
@@ -52,9 +53,11 @@ const gerarResposta = async (mensagens, aoReceberTrecho) => {
         }
         if (buffer.trim()) processarEvento(buffer)
     } catch (error) {
+        signal?.throwIfAborted()
         if (error.code) throw error
         throw criarErro('A conexão com a IA foi interrompida.', 'IA_FLUXO_INTERROMPIDO')
     }
+    signal?.throwIfAborted()
     if (!respostaCompleta.trim()) throw criarErro('A IA retornou uma resposta vazia.', 'IA_RESPOSTA_VAZIA')
     return respostaCompleta.trim()
 }

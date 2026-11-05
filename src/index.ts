@@ -1,8 +1,5 @@
-﻿export interface Env {
-  AI: Ai;
-  CHAT_RATE_LIMITER: RateLimit;
-  ASSETS: Fetcher;
-}
+import presentationPrompt from "./ai-presentation-prompt.js";
+export type Env = Cloudflare.Env;
 
 const ultimaPerguntaPorIp = new Map<string, number>();
 let ultimaLimpeza = Date.now();
@@ -10,15 +7,18 @@ const systemPrompt = "Você é uma assistente financeira pessoal acolhedora e co
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { ...corsHeaders, "Cache-Control": "no-store" } });
 
-const criarFluxoDoChat = (origem: ReadableStream, encoder: TextEncoder) => {
+const criarFluxoDoChat = (origem: ReadableStream, encoder: TextEncoder, onCancel: () => void) => {
   const reader = origem.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let cancelled = false;
   return new ReadableStream({
     async pull(controller) {
+      let emitted = false;
       try {
         while (true) {
           const { value, done } = await reader.read();
+          if (cancelled) return;
           buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
           const eventos = buffer.split(/\r?\n\r?\n/);
           buffer = eventos.pop() || "";
@@ -30,9 +30,16 @@ const criarFluxoDoChat = (origem: ReadableStream, encoder: TextEncoder) => {
             let dados: { response?: string; error?: string; choices?: Array<{ delta?: { content?: string | null }; message?: { content?: string | null } }> };
             try { dados = JSON.parse(bruto); } catch { continue; }
             const conteudo = dados.response || dados.choices?.[0]?.delta?.content || dados.choices?.[0]?.message?.content || "";
-            if (conteudo) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tipo: "trecho", conteudo })}\n\n`));
-            if (dados.error) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tipo: "erro", mensagem: dados.error })}\n\n`));
+            if (conteudo) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tipo: "trecho", conteudo })}\n\n`));
+              emitted = true;
+            }
+            if (dados.error) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tipo: "erro", mensagem: dados.error })}\n\n`));
+              emitted = true;
+            }
           }
+          if (!done && emitted) return;
           if (done) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tipo: "fim" })}\n\n`));
             controller.close();
@@ -40,11 +47,12 @@ const criarFluxoDoChat = (origem: ReadableStream, encoder: TextEncoder) => {
           }
         }
       } catch {
+        if (cancelled) return;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tipo: "erro", mensagem: "A conexão com a IA foi interrompida." })}\n\n`));
         controller.close();
       }
     },
-    cancel(reason) { return reader.cancel(reason); },
+    cancel(reason) { cancelled = true; onCancel(); return reader.cancel(reason); },
   });
 };
 
@@ -55,7 +63,7 @@ export default {
     const rotaChatPublico = url.pathname === "/v1/ia/chat-publico";
     const rotaLegada = url.pathname === "/chat";
     if ((rotaChatPublico || rotaLegada) && request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-    if (request.method !== "POST" || (!rotaChatPublico && !rotaLegada)) return env.ASSETS.fetch(request);
+    if (request.method !== "POST" || (!rotaChatPublico && !rotaLegada)) return json({ mensagem: "Rota não encontrada." }, 404);
 
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const agora = Date.now();
@@ -80,11 +88,11 @@ export default {
       if (!item || typeof item !== "object") return false;
       const mensagem = item as { role?: unknown; content?: unknown };
       const papeisPermitidos = rotaLegada ? ["system", "user", "assistant"] : ["user", "assistant"];
-      return papeisPermitidos.includes(String(mensagem.role)) && typeof mensagem.content === "string" && mensagem.content.trim().length > 0 && mensagem.content.length <= 2000;
+      return papeisPermitidos.includes(String(mensagem.role)) && typeof mensagem.content === "string" && mensagem.content.trim().length > 0 && mensagem.content.length <= (mensagem.role === "assistant" ? 16000 : 2000);
     });
     if (!validas) return json({ mensagem: "Mensagem inválida ou maior que 2000 caracteres." }, 400);
 
-    const mensagens = rotaChatPublico ? [{ role: "system", content: systemPrompt }, ...body.messages] : body.messages;
+    const mensagens = rotaChatPublico ? [{ role: "system", content: systemPrompt + "\n" + presentationPrompt }, ...body.messages] : body.messages;
     try {
       const stream = await env.AI.run("@cf/google/gemma-4-26b-a4b-it", {
         messages: mensagens as Array<{ role: "system" | "user" | "assistant"; content: string }>,
@@ -93,7 +101,9 @@ export default {
         chat_template_kwargs: { enable_thinking: true },
       });
       if (rotaLegada) return new Response(stream as ReadableStream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform" } });
-      return new Response(criarFluxoDoChat(stream as ReadableStream, new TextEncoder()), { headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Content-Type-Options": "nosniff" } });
+      return new Response(criarFluxoDoChat(stream as ReadableStream, new TextEncoder(), () => {
+        if (ultimaPerguntaPorIp.get(ip) === agora) ultimaPerguntaPorIp.delete(ip);
+      }), { headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Content-Type-Options": "nosniff" } });
     } catch (error) {
       console.error("Workers AI falhou:", error);
       return json({ mensagem: "A Cloudflare não conseguiu gerar a resposta." }, 502);

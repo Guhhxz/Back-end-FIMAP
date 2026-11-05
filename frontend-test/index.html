@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -136,6 +136,8 @@
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
   </style>
+  <link rel="stylesheet" href="/assets/ai-chat.css">
+  <link rel="stylesheet" href="/assets/vendor/highlight.css">
 </head>
 <body>
   <header class="site-header">
@@ -180,7 +182,8 @@
       <div class="composer">
         <span class="composer-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
         <form id="formulario">
-          <input id="mensagem" type="text" maxlength="4000" placeholder="Pergunte algo sobre suas finanças..." autocomplete="off" required aria-label="Sua mensagem">
+          <input id="mensagem" type="text" maxlength="2000" placeholder="Pergunte algo sobre suas finanças..." autocomplete="off" required aria-label="Sua mensagem">
+          <button id="parar" type="button" hidden aria-label="Parar resposta">■ Parar resposta</button>
           <button id="enviar" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </form>
       </div>
@@ -194,15 +197,28 @@
     <div class="footer-links"><span>Privacidade</span><span>Termos de Uso</span><span>Segurança Open Finance</span></div>
   </footer>
 
+  <script src="/config.js"></script>
+  <script src="/assets/vendor/marked.js"></script>
+  <script src="/assets/vendor/purify.js"></script>
+  <script src="/assets/vendor/highlight.js"></script>
+  <script src="/assets/ai-renderer.js"></script>
   <script>
     // Para usar o front em outro domínio, defina window.FIMAP_API_URL antes deste script.
-    const API_BASE_URL = (window.FIMAP_API_URL || '').replace(/\/+$/, '')
+    const API_BASE_URL = (window.FIMAP_API_URL || 'https://back-end-fimap.pedroday813.workers.dev').replace(/\/+$/, '')
     const formulario = document.getElementById('formulario')
     const campo = document.getElementById('mensagem')
     const conversa = document.getElementById('conversa')
     const carregando = document.getElementById('carregando')
     const botao = document.getElementById('enviar')
     const historico = []
+    const parar = document.getElementById('parar')
+    let controlador = null
+    let acompanhar = true
+    conversa.addEventListener('scroll', () => {
+      acompanhar = conversa.scrollHeight - conversa.scrollTop - conversa.clientHeight < 80
+    })
+    function rolar() { if (acompanhar) conversa.scrollTop = conversa.scrollHeight }
+    parar.addEventListener('click', () => controlador?.abort())
 
     function adicionarMensagem(papel, texto = '') {
       const bloco = document.createElement('div')
@@ -221,15 +237,20 @@
       balao.textContent = texto
       bloco.append(meta, balao)
       conversa.appendChild(bloco)
-      conversa.scrollTop = conversa.scrollHeight
+      rolar()
       return balao
     }
 
     formulario.addEventListener('submit', async (evento) => {
       evento.preventDefault()
+      if (controlador) return
       const conteudo = campo.value.trim()
       if (!conteudo) return
 
+      acompanhar = true
+      controlador = new AbortController()
+      parar.hidden = false
+      conversa.setAttribute('aria-busy', 'true')
       adicionarMensagem('user', conteudo)
       historico.push({ role: 'user', content: conteudo })
       const balaoAssistente = adicionarMensagem('assistant')
@@ -237,12 +258,20 @@
       carregando.textContent = 'Pensando…'
       botao.disabled = true
       let textoResposta = ''
+      let terminou = false
+      let renderPendente = null
+      const atualizar = () => {
+        renderPendente = null
+        FimapRenderer.render(balaoAssistente, textoResposta)
+        rolar()
+      }
 
       try {
         const resposta = await fetch(`${API_BASE_URL}/v1/ia/chat-publico`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: historico.slice(-10) })
+          body: JSON.stringify({ messages: historico.slice(-10) }),
+          signal: controlador.signal
         })
         if (!resposta.ok) {
           const erro = await resposta.json().catch(() => ({}))
@@ -264,27 +293,40 @@
             const dados = JSON.parse(linha.slice(6))
             if (dados.tipo === 'trecho') {
               textoResposta += dados.conteudo
-              balaoAssistente.textContent = textoResposta
-              carregando.textContent = ''
-              conversa.scrollTop = conversa.scrollHeight
+              if (!renderPendente) renderPendente = requestAnimationFrame(atualizar)
+              carregando.textContent = 'Respondendo…'
+            } else if (dados.tipo === 'fim') {
+              terminou = true
             } else if (dados.tipo === 'erro') {
               throw new Error(dados.mensagem || 'A assistente não conseguiu responder.')
             }
           }
           if (done) break
         }
+        if (!terminou) throw new Error('A conexão foi encerrada antes de concluir a resposta.')
         if (!textoResposta) throw new Error('A IA não retornou uma resposta. Tente novamente.')
         historico.push({ role: 'assistant', content: textoResposta })
-        if (historico.length > 10) historico.splice(0, historico.length - 10)
       } catch (erro) {
-        balaoAssistente.classList.add('error')
-        balaoAssistente.textContent = textoResposta
-          ? `${textoResposta}\n\nA resposta foi interrompida. Tente novamente.`
-          : `Não consegui responder agora. ${erro.message}`
-        if (!textoResposta) historico.pop()
+        const cancelada = controlador.signal.aborted
+        const estado = document.createElement('div')
+        estado.className = 'ai-state'
+        estado.textContent = cancelada ? 'Resposta interrompida por você. Pode enviar outra pergunta.' : `Não foi possível concluir: ${erro.message}`
+        balaoAssistente.parentElement.append(estado)
+        if (!cancelada) estado.setAttribute('role', 'alert')
+        // Interrupted answers remain visible but never enter the next request's context.
+        historico.pop()
+        if (!textoResposta) textoResposta = cancelada ? 'Resposta cancelada.' : 'Tente novamente em instantes.'
       } finally {
+        if (renderPendente) cancelAnimationFrame(renderPendente)
+        FimapRenderer.render(balaoAssistente, textoResposta, true)
+        balaoAssistente.parentElement.append(FimapRenderer.copy(textoResposta, 'Copiar resposta'))
+        if (historico.length > 10) historico.splice(0, historico.length - 10)
+        controlador = null
+        parar.hidden = true
+        conversa.setAttribute('aria-busy', 'false')
         carregando.textContent = ''
         botao.disabled = false
+        rolar()
         campo.focus()
       }
     })
