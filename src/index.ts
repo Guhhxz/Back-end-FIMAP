@@ -4,6 +4,16 @@
   ASSETS: Fetcher;
 }
 
+<<<<<<< HEAD
+const json = (body: unknown, status = 200) =>
+  Response.json(body, { 
+    status, 
+    headers: { 
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*" // Libera o navegador para ler o erro se houver
+    } 
+  });
+=======
 const ultimaPerguntaPorIp = new Map<string, number>();
 let ultimaLimpeza = Date.now();
 const systemPrompt = "Você é uma assistente financeira pessoal acolhedora e conversacional. Responda sempre em português do Brasil. Ajude com orçamento, gastos, dívidas e metas financeiras de forma simples e sem julgamentos. Não invente dados financeiros; pergunte quando faltarem informações. Suas respostas são informativas e não executam operações financeiras.";
@@ -47,6 +57,7 @@ const criarFluxoDoChat = (origem: ReadableStream, encoder: TextEncoder) => {
     cancel(reason) { return reader.cancel(reason); },
   });
 };
+>>>>>>> e2f2bd96c0e6aa97b89763f4c657413d4e9435c3
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -57,6 +68,34 @@ export default {
     if ((rotaChatPublico || rotaLegada) && request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
     if (request.method !== "POST" || (!rotaChatPublico && !rotaLegada)) return env.ASSETS.fetch(request);
 
+<<<<<<< HEAD
+    // 1. BLOCO NOVO: Libera o CORS para o seu HTML fazer a requisição sem ser bloqueado
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      });
+    }
+
+    if (request.method === "GET" && url.pathname === "/") {
+      return json({ online: true, service: "assistente-financeira" });
+    }
+
+    // A rota aceita é apenas "/chat"
+    if (request.method !== "POST" || url.pathname !== "/chat") {
+      return json({ error: "Rota não encontrada." }, 404);
+    }
+
+    if (!env.CHAT_API_TOKEN) {
+      return json({ error: "CHAT_API_TOKEN não foi configurado no Worker." }, 503);
+    }
+
+    if (request.headers.get("Authorization") !== `Bearer ${env.CHAT_API_TOKEN}`) {
+      return json({ error: "Acesso não autorizado." }, 401);
+=======
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const agora = Date.now();
     const ultimaPergunta = ultimaPerguntaPorIp.get(ip);
@@ -67,6 +106,7 @@ export default {
     if (ultimaPergunta && agora - ultimaPergunta < 5_000) {
       const segundos = Math.ceil((5_000 - (agora - ultimaPergunta)) / 1_000);
       return json({ mensagem: `Aguarde ${segundos} segundo(s) antes de enviar outra pergunta.` }, 429);
+>>>>>>> e2f2bd96c0e6aa97b89763f4c657413d4e9435c3
     }
     ultimaPerguntaPorIp.set(ip, agora);
     const limite = await env.CHAT_RATE_LIMITER.limit({ key: ip });
@@ -92,13 +132,29 @@ export default {
         temperature: 0.6,
         chat_template_kwargs: { enable_thinking: true },
       });
+<<<<<<< HEAD
+
+      return new Response(stream as ReadableStream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          "X-Content-Type-Options": "nosniff",
+          "Access-Control-Allow-Origin": "*" // Permite o streaming de texto no navegador
+        },
+      });
+=======
       if (rotaLegada) return new Response(stream as ReadableStream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform" } });
       return new Response(criarFluxoDoChat(stream as ReadableStream, new TextEncoder()), { headers: { ...corsHeaders, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Content-Type-Options": "nosniff" } });
+>>>>>>> e2f2bd96c0e6aa97b89763f4c657413d4e9435c3
     } catch (error) {
       console.error("Workers AI falhou:", error);
       return json({ mensagem: "A Cloudflare não conseguiu gerar a resposta." }, 502);
     }
   },
+<<<<<<< HEAD
+} satisfies ExportedHandler<Env>;
+=======
 } satisfies ExportedHandler<Env>;
 
 
+>>>>>>> e2f2bd96c0e6aa97b89763f4c657413d4e9435c3
