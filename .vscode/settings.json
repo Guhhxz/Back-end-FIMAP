@@ -1,0 +1,4 @@
+{
+    "appService.defaultWebAppToDeploy": "/subscriptions/c3c6494e-a7df-431c-b038-2c64210fcd0e/resourceGroups/fimap/providers/Microsoft.Web/sites/FimapAPI",
+    "appService.deploySubpath": "."
+}

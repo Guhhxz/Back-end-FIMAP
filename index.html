@@ -236,11 +236,7 @@
       let recebeuTrecho = false
 
       try {
-        const resposta = await fetch(`http://localhost:8080/v1/ia/chats/${encodeURIComponent(chatId)}/mensagens`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conteudo })
-        })
+        const resposta = await fetch(`https://fimapapi-hfdeb4ejctfuhpe0.canadacentral-01.azurewebsites.net/v1/ia/chats/${encodeURIComponent(chatId)}/mensagens`, {        })
         if (!resposta.ok || !resposta.body) throw new Error('Não foi possível conectar ao servidor.')
         const reader = resposta.body.getReader()
         const decoder = new TextDecoder()
