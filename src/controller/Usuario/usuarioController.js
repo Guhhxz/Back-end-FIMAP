@@ -213,7 +213,6 @@ const verificarOTPCadastro = async (req, res) => {
 const atualizarUsuario = async (req, res) => {
     try {
         const id_usuario = Number(req.params.id_usuario)
-        const { codigo } = req.body || {}
 
         if (!idValido(id_usuario)) {
             return responderErro(res, config_message.ID_USUARIO_INVALIDO)
@@ -234,16 +233,6 @@ const atualizarUsuario = async (req, res) => {
             if (!senhaValida(dados.senha)) {
                 return responderSenhaCurta(res)
             }
-
-            if (!codigo) {
-                return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
-            }
-
-            const otp = await codigoOTPModel.GetCodigoOTPValido(id_usuario, String(codigo))
-
-            if (!otp) {
-                return responderOTPInvalido(res)
-            }
         }
 
         // Se for trocar o username, garante que não pertence a outro usuário
@@ -253,11 +242,6 @@ const atualizarUsuario = async (req, res) => {
             if (existente && idDoUsuario(existente) !== id_usuario) {
                 return responderErro(res, config_message.DADOS_USUARIO_EXISTENTES)
             }
-        }
-
-        // Consome o código ANTES de gravar, para não permitir reuso
-        if (trocandoSenha) {
-            await codigoOTPModel.DesativarCodigoOTP(id_usuario, String(codigo))
         }
 
         // Senha em texto puro: o DAO faz o hash
