@@ -25,6 +25,22 @@ const CreateDispositivo = async (dispositivo) => {
     }
 }
 
+// Buscar um dispositivo do usuário pelo identificador (retorna o registro ou false)
+const GetDispositivoByIdentificador = async (id_usuario, identificador) => {
+    let sql = `select * from tbl_dispositivo
+        where id_usuario = ? and identificador = ?
+        limit 1`
+
+    try {
+        const [result] = await knexConex.raw(sql, [id_usuario, identificador])
+        return result.length > 0 ? result[0] : false
+
+    } catch (error) {
+        console.error('Erro ao buscar dispositivo:', error)
+        return false
+    }
+}
+
 // Buscar todos os dispositivos
 const GetAllDispositivos = async () => {
     let sql = `select * from tbl_dispositivo`
@@ -38,6 +54,19 @@ const GetAllDispositivos = async () => {
         return false
     }
 }
+
+const DeleteDispositivosUsuarios = async (id_usuario) => {
+    let sql = `delete from tbl_dispositivo where id_usuario = ?`
+
+    try {
+        const [result] = await knexConex.raw(sql, [id_usuario])
+        return result.affectedRows > 0
+    } catch (error) {
+        console.error('Erro ao deletar dispositivos do usuário:', error)
+        return false
+    }
+}
+
 
 // Verificar se o usuário existe
 const ExisteUsuario = async (id_usuario) => {
@@ -101,6 +130,8 @@ const DeletarDispositivo = async (id_dispositivo) => {
 module.exports = {
     CreateDispositivo,
     GetAllDispositivos,
+    GetDispositivoByIdentificador,
+    DeleteDispositivosUsuarios,
     ExisteUsuario,
     ValidarDispositivo,
     DeletarDispositivo

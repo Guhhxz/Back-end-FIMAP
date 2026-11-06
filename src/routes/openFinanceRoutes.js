@@ -5,6 +5,10 @@ const openFinanceController = require("../controller/OpenFinance/openFinanceCont
 
 router.post("/connect-token", openFinanceController.gerarConnectToken)
 
+// -------------------- CONEXÕES -------------------- 
+router.post("/conexoes/:idUsuario", openFinanceController.adicionarConexao)
+router.get("/conexoes/:idUsuario", openFinanceController.listarConexoes)
+
 // -------------------- OBTER DADOS -------------------- 
 router.get("/financeiro/contas/:itemId", openFinanceController.obterContas)
 router.get("/financeiro/cartoes/:itemId", openFinanceController.obterCartoes)

@@ -1,0 +1,294 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f7f7f7">
+  <title>Fimap AI — Chat IA</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #171717;
+      --muted: #85858a;
+      --line: #ededee;
+      --panel: #fff;
+      --canvas: #f7f7f8;
+      --soft: #f1f1f2;
+      --green: #22a55a;
+      --shadow: 0 8px 28px rgba(20, 20, 20, .045);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--ink); background: #fff; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .site-header { height: 70px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(18px, 5vw, 64px); border-bottom: 1px solid #f0f0f0; background: #fff; }
+    .brand-area, .brand, .top-actions, .main-nav, .nav-item, .copilot-title, .connection, .chat-toolbar, .message-meta, .plan-heading, .plan-label, .plan-value, .composer, .footer-links { display: flex; align-items: center; }
+    .brand-area { gap: 16px; }
+    .back-button, .icon-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; color: #444; background: transparent; border: 0; border-radius: 10px; }
+    .back-button svg, .icon-button svg { width: 18px; height: 18px; }
+    .brand { gap: 8px; color: #111; font-size: 14px; font-weight: 760; letter-spacing: -.035em; }
+    .brand-symbol { display: grid; place-items: center; width: 23px; height: 23px; color: #fff; background: #101010; border-radius: 6px; }
+    .brand-symbol svg { width: 16px; height: 16px; }
+    .main-nav { height: 100%; gap: 7px; }
+    .nav-item { gap: 6px; height: 35px; padding: 0 12px; color: #76767a; border-radius: 8px; font-size: 11px; text-decoration: none; white-space: nowrap; }
+    .nav-item svg { width: 14px; height: 14px; }
+    .nav-item.active { color: #fff; background: #090909; font-weight: 650; }
+    .nav-item.disabled { opacity: .8; }
+    .top-actions { gap: 4px; }
+    .app-main { max-width: 1320px; min-height: calc(100vh - 115px); margin: 0 auto; padding: 25px clamp(16px, 4vw, 52px) 22px; background: var(--canvas); }
+    .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 0 0 18px; }
+    .heading-start { display: flex; align-items: center; gap: 15px; }
+    .menu-button { display: grid; place-items: center; width: 28px; height: 32px; color: #4b4b4d; background: transparent; border: 0; }
+    .menu-button svg { width: 18px; height: 18px; }
+    .copilot-title { gap: 10px; }
+    .sparkle-mark { position: relative; display: grid; place-items: center; width: 39px; height: 39px; color: #fff; background: #0a0a0a; border-radius: 50%; }
+    .sparkle-mark svg { width: 21px; height: 21px; }
+    .sparkle-mark::after { content: ""; position: absolute; right: 0; bottom: 1px; width: 9px; height: 9px; background: var(--green); border: 2px solid var(--canvas); border-radius: 50%; }
+    .title-line { display: flex; align-items: center; gap: 8px; }
+    .title-line h1 { margin: 0; font-size: 19px; font-weight: 730; letter-spacing: -.045em; }
+    .version { padding: 3px 6px; color: #68686b; background: #ececee; border-radius: 5px; font-size: 9px; font-weight: 650; }
+    .connection { gap: 5px; margin-top: 4px; color: #9a9a9e; font-size: 10px; }
+    .connection svg { width: 12px; height: 12px; color: #777; }
+    .settings-button { width: 33px; height: 33px; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+    .chat-frame { display: flex; flex-direction: column; min-height: min(730px, calc(100vh - 210px)); padding: 19px 16px 0; background: #fff; border: 1px solid #f0f0f1; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.018); }
+    .chat-toolbar { min-height: 17px; gap: 6px; margin: 0 2px 10px; color: #98989c; font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
+    .toolbar-dot { width: 3px; height: 3px; background: #c8c8ca; border-radius: 50%; }
+    #conversa { display: flex; flex: 1; flex-direction: column; gap: 17px; min-height: 350px; padding: 0 0 16px; overflow-y: auto; scroll-behavior: smooth; }
+    .message-block { display: flex; flex-direction: column; gap: 7px; max-width: min(82%, 780px); animation: arrive .2s ease-out; }
+    .message-block.assistant { align-self: flex-start; }
+    .message-block.user { align-self: flex-end; align-items: flex-end; }
+    .message-meta { gap: 7px; padding: 0 2px; color: #909095; font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
+    .message-block.user .message-meta { justify-content: flex-end; }
+    .bubble { padding: 13px 16px; color: #222; background: var(--soft); border-radius: 0 13px 13px 13px; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .message-block.user .bubble { color: white; background: #050505; border-radius: 13px 0 13px 13px; }
+    .bubble.error { color: #9e3030; background: #fff0ef; }
+    .welcome-bubble { max-width: 450px; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 7px; padding: 1px 2px 0; }
+    .suggestion { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; color: #444448; background: #f3f3f4; border: 1px solid transparent; border-radius: 999px; font-size: 10px; cursor: pointer; transition: background .15s, border-color .15s; }
+    .suggestion svg { width: 12px; height: 12px; }
+    .suggestion:hover { background: #eaeaec; border-color: #e0e0e2; }
+    .action-plan { width: min(100%, 900px); margin: 0 0 2px; padding: 15px; background: #f2f2f3; border-radius: 12px; }
+    .plan-heading { justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+    .plan-label { gap: 6px; width: fit-content; padding: 6px 9px; color: #171717; background: white; border-radius: 999px; font-size: 10px; font-weight: 700; }
+    .plan-label svg { width: 13px; height: 13px; }
+    .plan-status { color: #88888d; font-size: 8px; letter-spacing: .09em; text-transform: uppercase; }
+    .plan-copy { margin: 0 0 11px; color: #4a4a4e; font-size: 11px; line-height: 1.55; }
+    .plan-empty { display: flex; align-items: flex-start; gap: 10px; padding: 13px; color: #68686d; background: #fff; border-radius: 9px; font-size: 10px; line-height: 1.55; }
+    .plan-empty svg { width: 16px; height: 16px; flex: 0 0 auto; color: #77777c; }
+    .plan-empty strong { display: block; margin-bottom: 2px; color: #28282b; font-size: 11px; }
+    .plan-action { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; min-height: 38px; margin-top: 10px; padding: 8px 12px; color: #fff; background: #090909; border: 0; border-radius: 9px; font-size: 10px; font-weight: 650; cursor: pointer; }
+    .plan-action:hover { background: #292929; }
+    .plan-action svg { width: 14px; height: 14px; }
+    .chat-spacer { flex: 1; min-height: 10px; }
+    .composer { gap: 10px; min-height: 46px; margin: 0 0 8px; padding: 5px 7px 5px 15px; background: #f3f3f4; border: 1px solid #efeff0; border-radius: 13px; box-shadow: 0 3px 12px rgba(0,0,0,.04); transition: border-color .15s, box-shadow .15s; }
+    .composer:focus-within { border-color: #c7c7ca; box-shadow: 0 0 0 3px rgba(0,0,0,.035); }
+    .composer-symbol { display: grid; place-items: center; width: 18px; height: 24px; color: #77777c; }
+    .composer-symbol svg { width: 16px; height: 16px; }
+    #formulario { display: flex; flex: 1; align-items: center; min-width: 0; gap: 8px; }
+    #mensagem { flex: 1; width: 100%; min-width: 0; padding: 7px 0; color: #252528; background: transparent; border: 0; outline: 0; font-size: 11px; }
+    #mensagem::placeholder { color: #99999e; }
+    #enviar { display: grid; place-items: center; width: 31px; height: 31px; flex: 0 0 auto; color: #fff; background: #080808; border: 0; border-radius: 50%; cursor: pointer; transition: transform .15s, background .15s; }
+    #enviar:hover:not(:disabled) { background: #333; transform: translateY(-1px); }
+    #enviar:disabled { opacity: .5; cursor: wait; }
+    #enviar svg { width: 15px; height: 15px; }
+    #carregando { min-height: 14px; margin: 0 4px 5px; color: #8c8c90; font-size: 9px; text-align: center; }
+    .chat-disclaimer { margin: 0 0 12px; color: #a0a0a4; font-size: 8px; text-align: center; }
+    .site-footer { display: flex; justify-content: space-between; gap: 16px; max-width: 1320px; margin: 0 auto; padding: 16px clamp(16px, 4vw, 52px); color: #858589; font-size: 9px; }
+    .footer-links { gap: 20px; }
+    .footer-links span { white-space: nowrap; }
+    @keyframes arrive { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    @media (min-width: 1500px) { .app-main, .site-footer { max-width: 1440px; } }
+    @media (max-width: 760px) {
+      .site-header { height: 58px; padding: 0 14px; }
+      .main-nav { gap: 2px; }
+      .nav-item { width: 36px; justify-content: center; padding: 0; font-size: 0; }
+      .nav-item svg { width: 16px; height: 16px; }
+      .top-actions { display: none; }
+      .app-main { min-height: calc(100vh - 98px); padding: 18px 12px 12px; }
+      .page-heading { margin-bottom: 13px; }
+      .chat-frame { min-height: calc(100dvh - 205px); padding: 15px 12px 0; }
+      #conversa { min-height: 300px; }
+      .message-block { max-width: 92%; }
+      .action-plan { padding: 12px; }
+      .site-footer { padding: 13px 15px; font-size: 8px; }
+      .footer-links { gap: 10px; }
+    }
+    @media (max-width: 460px) {
+      .brand-area { gap: 7px; }
+      .back-button { width: 25px; }
+      .brand { font-size: 12px; }
+      .main-nav { margin-left: auto; }
+      .nav-item { width: 31px; }
+      .page-heading { align-items: flex-start; }
+      .heading-start { gap: 8px; }
+      .menu-button { width: 21px; }
+      .sparkle-mark { width: 34px; height: 34px; }
+      .title-line h1 { font-size: 17px; }
+      .version { font-size: 8px; }
+      .connection { font-size: 9px; }
+      .settings-button { width: 29px; }
+      .chat-frame { min-height: calc(100dvh - 185px); padding: 12px 10px 0; }
+      #conversa { gap: 13px; }
+      .bubble { padding: 11px 13px; font-size: 12px; }
+      .suggestion { font-size: 9px; }
+      .plan-status { font-size: 7px; }
+      .site-footer { flex-direction: column; gap: 7px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand-area">
+      <button class="back-button" type="button" aria-label="Voltar" title="Voltar" onclick="history.back()">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="brand"><span class="brand-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 18 11.3 5l2.4 6.2 2-3.7L20 18H5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 15h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>Fimap</div>
+    </div>
+    <nav class="main-nav" aria-label="Navegação principal">
+      <span class="nav-item disabled" title="Início"><svg viewBox="0 0 24 24" fill="none"><path d="m4 10 8-7 8 7v10h-6v-6h-4v6H4V10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span>Início</span></span>
+      <span class="nav-item active" aria-current="page"><svg viewBox="0 0 24 24" fill="none"><path d="M5 5.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 2v-2a2 2 0 0 1-3-2v-9a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.5"/><path d="m12 7 .8 2.2L15 10l-2.2.8L12 13l-.8-2.2L9 10l2.2-.8L12 7Z" fill="currentColor"/></svg><span>Chat IA</span></span>
+      <span class="nav-item disabled" title="Simular"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h3v3H8zM14 8h2M14 11h2M8 14h8M8 17h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>Simular</span></span>
+      <span class="nav-item disabled" title="Metas"><svg viewBox="0 0 24 24" fill="none"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span>Metas</span></span>
+      <span class="nav-item disabled" title="Social"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="9" r="2.4" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 19c.4-3 2.2-4.5 5.5-4.5s5.1 1.5 5.5 4.5M15 14.8c2.9-.3 4.7 1.1 5.2 3.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Social</span></span>
+    </nav>
+    <div class="top-actions">
+      <button class="icon-button" type="button" aria-label="Notificações" title="Notificações"><svg viewBox="0 0 24 24" fill="none"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="icon-button" type="button" aria-label="Configurações" title="Configurações"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z" stroke="currentColor" stroke-width="1.6"/><path d="m19.4 15 .1.1 1.1.8-1 1.8-1.3-.5a7.9 7.9 0 0 1-1.6.9l-.2 1.4h-2.1l-.4-1.3a7.9 7.9 0 0 1-1.8 0l-.8 1.1-1.9-.8.3-1.4a7.7 7.7 0 0 1-1.3-1.2l-1.3.2-.8-1.9 1.1-.8a7.8 7.8 0 0 1-.1-1.8l-1.1-.8.8-1.9 1.4.3a7.9 7.9 0 0 1 1.3-1.3l-.2-1.3 1.9-.8.8 1.1a7.8 7.8 0 0 1 1.8-.1l.8-1.1 1.9.8-.3 1.4a7.9 7.9 0 0 1 1.3 1.3l1.4-.2.8 1.9-1.1.8a7.8 7.8 0 0 1 0 1.8Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg></button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <section class="page-heading" aria-label="Assistente">
+      <div class="heading-start">
+        <button class="menu-button" type="button" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <div class="copilot-title">
+          <span class="sparkle-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 2 1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z" fill="currentColor"/></svg></span>
+          <div>
+            <div class="title-line"><h1>Fimap AI</h1><span class="version">Copilot v2.4</span></div>
+            <div class="connection"><svg viewBox="0 0 24 24" fill="none"><path d="M5 9a11 11 0 0 1 14 0M8 12a6.5 6.5 0 0 1 8 0m-5.3 3.2a2 2 0 0 1 2.6 0M12 19h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Assistente financeira online</div>
+          </div>
+        </div>
+      </div>
+      <button class="icon-button settings-button" type="button" aria-label="Preferências da conversa" title="Preferências"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h9M17 7h3M4 17h3m4 0h9M13 4v6M7 14v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="15" cy="7" r="2" fill="white" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="17" r="2" fill="white" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </section>
+
+    <section class="chat-frame" aria-label="Conversa com Fimap AI">
+      <div class="chat-toolbar"><span>Copilot</span><span class="toolbar-dot"></span><span>Agora</span></div>
+      <div id="conversa" aria-live="polite" aria-relevant="additions text"></div>
+
+      <div class="composer">
+        <span class="composer-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+        <form id="formulario">
+          <input id="mensagem" type="text" maxlength="4000" placeholder="Pergunte algo sobre suas finanças..." autocomplete="off" required aria-label="Sua mensagem">
+          <button id="enviar" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </form>
+      </div>
+      <p id="carregando" role="status"></p>
+      <p class="chat-disclaimer">A Fimap AI pode cometer erros. Confira informações importantes antes de tomar decisões.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>© 2025 Fimap Tecnologia e Finanças S.A. Todos os direitos reservados.</span>
+    <div class="footer-links"><span>Privacidade</span><span>Termos de Uso</span><span>Segurança Open Finance</span></div>
+  </footer>
+
+  <script>
+    // Para usar o front em outro domínio, defina window.FIMAP_API_URL antes deste script.
+    const API_BASE_URL = (window.FIMAP_API_URL || '').replace(/\/+$/, '')
+    const formulario = document.getElementById('formulario')
+    const campo = document.getElementById('mensagem')
+    const conversa = document.getElementById('conversa')
+    const carregando = document.getElementById('carregando')
+    const botao = document.getElementById('enviar')
+    const historico = []
+
+    function adicionarMensagem(papel, texto = '') {
+      const bloco = document.createElement('div')
+      bloco.className = `message-block ${papel}`
+      const meta = document.createElement('div')
+      meta.className = 'message-meta'
+      const nome = document.createElement('span')
+      nome.textContent = papel === 'user' ? 'Você' : 'Copilot'
+      const separador = document.createElement('span')
+      separador.className = 'toolbar-dot'
+      const hora = document.createElement('span')
+      hora.textContent = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date())
+      meta.append(nome, separador, hora)
+      const balao = document.createElement('div')
+      balao.className = 'bubble'
+      balao.textContent = texto
+      bloco.append(meta, balao)
+      conversa.appendChild(bloco)
+      conversa.scrollTop = conversa.scrollHeight
+      return balao
+    }
+
+    formulario.addEventListener('submit', async (evento) => {
+      evento.preventDefault()
+      const conteudo = campo.value.trim()
+      if (!conteudo) return
+
+      adicionarMensagem('user', conteudo)
+      historico.push({ role: 'user', content: conteudo })
+      const balaoAssistente = adicionarMensagem('assistant')
+      campo.value = ''
+      carregando.textContent = 'Pensando…'
+      botao.disabled = true
+      let textoResposta = ''
+
+      try {
+        const resposta = await fetch(`${API_BASE_URL}/v1/ia/chat-publico`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: historico.slice(-10) })
+        })
+        if (!resposta.ok) {
+          const erro = await resposta.json().catch(() => ({}))
+          throw new Error(erro.mensagem || `O servidor respondeu com status ${resposta.status}.`)
+        }
+        if (!resposta.body) throw new Error('O servidor não iniciou o fluxo de resposta.')
+
+        const reader = resposta.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { value, done } = await reader.read()
+          buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+          const eventos = buffer.split(/\r?\n\r?\n/)
+          buffer = eventos.pop() || ''
+          for (const eventoSse of eventos) {
+            const linha = eventoSse.split(/\r?\n/).find((item) => item.startsWith('data: '))
+            if (!linha) continue
+            const dados = JSON.parse(linha.slice(6))
+            if (dados.tipo === 'trecho') {
+              textoResposta += dados.conteudo
+              balaoAssistente.textContent = textoResposta
+              carregando.textContent = ''
+              conversa.scrollTop = conversa.scrollHeight
+            } else if (dados.tipo === 'erro') {
+              throw new Error(dados.mensagem || 'A assistente não conseguiu responder.')
+            }
+          }
+          if (done) break
+        }
+        if (!textoResposta) throw new Error('A IA não retornou uma resposta. Tente novamente.')
+        historico.push({ role: 'assistant', content: textoResposta })
+        if (historico.length > 10) historico.splice(0, historico.length - 10)
+      } catch (erro) {
+        balaoAssistente.classList.add('error')
+        balaoAssistente.textContent = textoResposta
+          ? `${textoResposta}\n\nA resposta foi interrompida. Tente novamente.`
+          : `Não consegui responder agora. ${erro.message}`
+        if (!textoResposta) historico.pop()
+      } finally {
+        carregando.textContent = ''
+        botao.disabled = false
+        campo.focus()
+      }
+    })
+  </script>
+</body>
+</html>
+

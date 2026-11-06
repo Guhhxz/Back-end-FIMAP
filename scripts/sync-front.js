@@ -1,0 +1,7 @@
+﻿const fs = require('node:fs')
+const path = require('node:path')
+const raiz = path.resolve(__dirname, '..')
+const pastaPublica = path.join(raiz, 'public')
+fs.mkdirSync(pastaPublica, { recursive: true })
+fs.copyFileSync(path.join(raiz, 'index.html'), path.join(pastaPublica, 'index.html'))
+console.log('Front copiado para public/index.html')

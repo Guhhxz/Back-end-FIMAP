@@ -1,5 +1,6 @@
 
 const pluggy = require("../config/pluggy")
+const conexaoDAO = require("../../model/DAO/OpenFinance/conexaoOpenFinanceDAO.js")
 
 const numeroOuNull = (...valores) => {
     for (const valor of valores) {
@@ -316,6 +317,30 @@ const listarTransacoes = async (itemId) => {
     }
 }
 
+// ============================================
+// CONEXÕES
+// ============================================
+
+const adicionarConexao = async (conexao) => {
+    try {
+        const resultado = await conexaoDAO.criarConexao(conexao)
+        return resultado
+    } catch (error) {
+        console.error("Erro ao adicionar conexão:", error)
+        return false
+    }
+}
+
+const listarConexoesPorUsuario = async (idUsuario) => {
+    try {
+        const conexoes = await conexaoDAO.listarConexoesPorUsuario(idUsuario)
+        return conexoes
+    } catch (error) {
+        console.error("Erro ao listar conexões:", error)
+        return []
+    }
+}
+
 module.exports = {
     criarConnectToken,
     buscarSaldo,
@@ -324,4 +349,6 @@ module.exports = {
     listarInvestimentos,
     listarEmprestimos,
     listarTransacoes,
+    adicionarConexao,
+    listarConexoesPorUsuario,
 }
