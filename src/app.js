@@ -8,11 +8,12 @@ const cors = require("cors")
 const path = require("path")
 
 // Importando rotas e controllers
-const openFinanceRoutes = require("./routes/openFinanceRoutes")
+const openFinanceRoutes = require("../src/routes/openFinanceRoutes.js")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
+const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 
 const app = express()
 
@@ -61,6 +62,9 @@ app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagem
 
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
+
+
+app.use("/v1/openfinance/seguindo", seguir_seguidoresRoutes)
 
 const PORT = process.env.PORT || 8080
 
