@@ -61,6 +61,9 @@ app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagem
 
 
 
+//Simulacoes
+app.use("/v1", simulacoesRoutes)
+
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
 app.use("/v1/metas", metasRoutes)
