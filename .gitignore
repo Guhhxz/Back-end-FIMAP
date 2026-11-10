@@ -9,3 +9,4 @@ node_modules/
 
 # Bibliotecas geradas apenas para a interface opcional de teste
 frontend-test/assets/vendor/
+node_modules/
