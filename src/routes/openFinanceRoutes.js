@@ -2,6 +2,7 @@ const express = require("express")
 const router = express.Router()
 
 const openFinanceController = require("../controller/OpenFinance/openFinanceController.js")
+const extratoCartaoController = require("../controller/OpenFinance/extratoCartaoController.js")
 
 router.post("/connect-token", openFinanceController.gerarConnectToken)
 
@@ -17,6 +18,10 @@ router.get("/financeiro/emprestimos/:itemId", openFinanceController.obterEmprest
 router.get("/financeiro/transacoes/:itemId", openFinanceController.obterTransacoes)
 router.get("/financeiro/saldo/:itemId", openFinanceController.obterSaldo)
 router.get("/financeiro/resumo", openFinanceController.obterResumosBancario)
+router.get("/financeiro/cartoes/:cartaoId/fatura", openFinanceController.obterFaturaCartao)
+router.get("/financeiro/cartoes/:cartaoId/gastos-por-categoria", openFinanceController.obterGastosCartao)
+router.get("/financeiro/cartoes/:cartaoId/transacoes", openFinanceController.obterTransacoesCartao)
+router.get("/financeiro/cartoes/:cartaoId/extrato", extratoCartaoController.obterExtratoCartao)
 
 
 module.exports = router

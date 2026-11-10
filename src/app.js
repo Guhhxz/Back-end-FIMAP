@@ -63,7 +63,7 @@ app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
 app.use("/v1/openfinance/seguindo", seguir_seguidoresRoutes)
 app.use("/v1/configuracoes", configuracoesRoutes)
-app.use("/v1/openfinance", metasRoutes)
+app.use("/v1/openfinance/metas", metasRoutes)
 const PORT = process.env.PORT || 8080
 
 const servidor = app.listen(PORT, (erro) => {
