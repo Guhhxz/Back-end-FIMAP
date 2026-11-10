@@ -79,7 +79,7 @@ const GetBadgeByNome = async (nome) => {
 // Buscar todas as badges
 const GetAllBadges = async () => {
     try {
-        return await knexConex('tbl_badge').select('id', 'icone', 'nome', 'descricao', 'xp')
+        return await knexConex('tbl_badge').select( 'icone', 'nome', 'descricao', 'xp')
     } catch (error) {
         console.error('Erro ao buscar todas as badges:', error)
         return false

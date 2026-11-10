@@ -1,12 +1,17 @@
 const express = require("express")
 const router = express.Router()
 
-const usuarioController = require("../controller/Usuario/usuarioController.js")
+const badgeController = require("../controller/Badge/BadgeController.js")
+const badgeUserController = require("../controller/BadgeUser/badgeUserController.js")
 
-router.post("/criar-usuario", usuarioController.criarUsuario)
-router.patch("/usuario-update/:id_usuario", usuarioController.atualizarUsuario)
-router.get("/usuario/:username", usuarioController.buscarUsuarioPorUsername)
-router.get("/usuarios", usuarioController.buscarTodosUsuarios)
-router.delete("/usuario-delete/:id_usuario", usuarioController.deletarUsuario)
+// Rotas para badge-usuario
+router.post("/badge-usuario", badgeUserController.AtrelarBadgeUsuario)
+router.get("/badge-usuario/:id_usuario", badgeUserController.BuscarBadgesUsuario)
+router.delete("/badge-usuario", badgeUserController.RemoverBadgeUsuario)
 
-module.exports = router
+router.post("/criar-badge", badgeController.criarBadge)
+router.patch("/badge-update/:id_badge", badgeController.atualizarBadge)
+router.get("/badges", badgeController.buscarTodasBadges)
+router.delete("/badge-delete/:id_badge", badgeController.deletarBadge)
+
+module.exports = router  

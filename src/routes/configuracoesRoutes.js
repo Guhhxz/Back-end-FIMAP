@@ -3,7 +3,7 @@ const router = express.Router()
 
 const configuracoesController = require("../controller/Configuracoes/ConfiguracoesController.js")
 
-router.get("/:id_usuario", configuracoesController.getConfiguracoes)
-router.patch("/:idusuario", configuracoesController.updateConfiguracoes)
+router.get("/:id_usuario", configuracoesController.getConfiguracoesById)
+router.patch("/:idusuario", configuracoesController.updateConfiguracoesById)
 
 module.exports = router 
