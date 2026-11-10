@@ -60,4 +60,24 @@ const criarMeta = async (usuarioId, dados) => {
     return serializar(await consultar(usuarioId, id))
 }
 
-module.exports = { listarCategoriasMeta, listarMetas, criarMeta }
+const buscarMeta = async (usuarioId, id) => serializar(await consultar(usuarioId, id))
+
+const atualizarMeta = async (usuarioId, id, dados) => {
+    const campos = {
+        nome: dados.nome === undefined ? undefined : dados.nome.trim(),
+        descricao: dados.descricao,
+        valor_inicio: dados.valor_inicio,
+        valor_desejado: dados.valor_desejado,
+        valor_total: dados.valor_total,
+        data_alvo: dados.data_alvo,
+        status: dados.status === undefined ? undefined : statusParaCodigo[dados.status],
+        id_categoria: dados.categoria_id
+    }
+    Object.keys(campos).forEach((campo) => campos[campo] === undefined && delete campos[campo])
+    const alterados = await knex(metas).where({ id, id_usuario: usuarioId }).update(campos)
+    return alterados ? buscarMeta(usuarioId, id) : null
+}
+
+const excluirMeta = (usuarioId, id) => knex(metas).where({ id, id_usuario: usuarioId }).del()
+
+module.exports = { listarCategoriasMeta, listarMetas, criarMeta, buscarMeta, atualizarMeta, excluirMeta }

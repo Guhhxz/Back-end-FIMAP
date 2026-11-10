@@ -71,4 +71,59 @@ const criarMeta = async (req, res) => {
     }
 }
 
-module.exports = { listarCategoriasMeta, listarMetas, criarMeta }
+const buscarMeta = async (req, res) => {
+    const usuarioId = usuarioAutenticado(req)
+    const id = idPositivo(req.params.id)
+    if (!usuarioId) return enviarErro(res, 401, 'Usuário não autenticado.')
+    if (!id) return enviarErro(res, 422, 'Identificador da meta inválido.')
+    try {
+        const meta = await dao.buscarMeta(usuarioId, id)
+        return meta ? res.status(200).json(meta) : enviarErro(res, 404, 'Meta não encontrada.')
+    } catch (error) {
+        console.error('Erro ao buscar meta:', error)
+        return enviarErro(res, 500, 'Erro interno do servidor.')
+    }
+}
+
+const atualizarMeta = async (req, res) => {
+    const usuarioId = usuarioAutenticado(req)
+    const id = idPositivo(req.params.id)
+    const body = req.body
+    if (!usuarioId) return enviarErro(res, 401, 'Usuário não autenticado.')
+    if (!id) return enviarErro(res, 422, 'Identificador da meta inválido.')
+    if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.keys(body).length ||
+        (body.nome !== undefined && (typeof body.nome !== 'string' || !body.nome.trim() || [...body.nome].length > 100)) ||
+        (body.valor_desejado !== undefined && (!valorValido(body.valor_desejado) || body.valor_desejado <= 0)) ||
+        (body.categoria_id !== undefined && !idPositivo(body.categoria_id)) ||
+        (body.descricao !== undefined && body.descricao !== null && typeof body.descricao !== 'string') ||
+        (body.valor_inicio !== undefined && !valorValido(body.valor_inicio)) ||
+        (body.valor_total !== undefined && !valorValido(body.valor_total)) ||
+        (body.status !== undefined && !statusValidos.includes(body.status)) ||
+        (body.data_alvo !== undefined && body.data_alvo !== null &&
+            (typeof body.data_alvo !== 'string' || Number.isNaN(Date.parse(body.data_alvo))))) {
+        return enviarErro(res, 422, 'Dados da meta inválidos.')
+    }
+    try {
+        const meta = await dao.atualizarMeta(usuarioId, id, body)
+        return meta ? res.status(200).json(meta) : enviarErro(res, 404, 'Meta não encontrada.')
+    } catch (error) {
+        console.error('Erro ao atualizar meta:', error)
+        return enviarErro(res, 500, 'Erro interno do servidor.')
+    }
+}
+
+const excluirMeta = async (req, res) => {
+    const usuarioId = usuarioAutenticado(req)
+    const id = idPositivo(req.params.id)
+    if (!usuarioId) return enviarErro(res, 401, 'Usuário não autenticado.')
+    if (!id) return enviarErro(res, 422, 'Identificador da meta inválido.')
+    try {
+        const excluidas = await dao.excluirMeta(usuarioId, id)
+        return excluidas ? res.status(200).json({ sucesso: true }) : enviarErro(res, 404, 'Meta não encontrada.')
+    } catch (error) {
+        console.error('Erro ao excluir meta:', error)
+        return enviarErro(res, 500, 'Erro interno do servidor.')
+    }
+}
+
+module.exports = { listarCategoriasMeta, listarMetas, criarMeta, buscarMeta, atualizarMeta, excluirMeta }

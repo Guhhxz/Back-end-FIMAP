@@ -15,9 +15,16 @@ const config_message = {
         mensagem: 'Operação realizada com sucesso, sem conteúdo para retornar.'
     },
 
+
     // ==========================================
     // ERROS DO CLIENTE - 4XX
     // ==========================================
+
+    NENHUM_CAMPO_ATUALIZAR: {
+    status: 400,
+    mensagem: 'Informe pelo menos um campo para atualizar'
+},
+
     REQUISICAO_INVALIDA: {
         status: 400,
         mensagem: 'Os dados enviados são inválidos.'

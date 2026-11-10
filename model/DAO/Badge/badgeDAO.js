@@ -3,9 +3,17 @@ const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
+const CAMPOS_ATUALIZAVEIS = ['icone', 'nome', 'descricao', 'xp']
+
+// Convenção de retorno das funções de escrita:
+//   true / id  -> sucesso
+//   false      -> nenhum registro afetado (não encontrado)
+//   null       -> erro de banco
+//   'DUPLICADO' / 'EM_USO' -> violação de UNIQUE / FOREIGN KEY
+
 // Criar badge
 const CreateBadge = async (badge) => {
-    let sql = `insert into tbl_badge
+    const sql = `insert into tbl_badge
         (icone, nome, descricao, xp)
         values (?, ?, ?, ?)`
 
@@ -19,36 +27,58 @@ const CreateBadge = async (badge) => {
 
         return result.insertId
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return 'DUPLICADO'
+
         console.error('Erro ao criar badge:', error)
-        return false
+        return null
     }
 }
 
-// Atualizar badge
+// Atualizar badge (parcial: só os campos enviados)
 const UpdateBadge = async (badge) => {
-    let sql = `update tbl_badge
-        set icone = ?, nome = ?, descricao = ?, xp = ?
+    const sets = []
+    const valores = []
+
+    for (const campo of CAMPOS_ATUALIZAVEIS) {
+        if (badge[campo] !== undefined) {
+            sets.push(`${campo} = ?`)
+            valores.push(badge[campo])
+        }
+    }
+
+    if (sets.length === 0) return false
+
+    const sql = `update tbl_badge
+        set ${sets.join(', ')}
         where id = ?`
 
     try {
-        const [result] = await knexConex.raw(sql, [
-            badge.icone,
-            badge.nome,
-            badge.descricao,
-            badge.xp,
-            badge.id
-        ])
+        const [result] = await knexConex.raw(sql, [...valores, badge.id])
 
         return result.affectedRows > 0
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return 'DUPLICADO'
+
         console.error('Erro ao atualizar badge:', error)
-        return false
+        return null
+    }
+}
+
+// Buscar badge pelo id
+const GetBadgeById = async (id) => {
+    try {
+        const [result] = await knexConex.raw('select * from tbl_badge where id = ?', [id])
+
+        return result[0] || null
+    } catch (error) {
+        console.error('Erro ao buscar badge por id:', error)
+        return null
     }
 }
 
 // Deletar badge
 const DeleteBadge = async (badge) => {
-    let sql = `delete from tbl_badge
+    const sql = `delete from tbl_badge
         where id = ?`
 
     try {
@@ -56,14 +86,16 @@ const DeleteBadge = async (badge) => {
 
         return result.affectedRows > 0
     } catch (error) {
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') return 'EM_USO'
+
         console.error('Erro ao deletar badge:', error)
-        return false
+        return null
     }
 }
 
 // Buscar badge pelo nome
 const GetBadgeByNome = async (nome) => {
-    let sql = `select * from tbl_badge
+    const sql = `select * from tbl_badge
         where nome = ?`
 
     try {
@@ -86,31 +118,26 @@ const GetAllBadges = async () => {
     }
 }
 
-// Validar se a badge já existe pelo nome
-const ValidarBadge = async (badge) => {
+// Verifica se já existe badge com o mesmo nome (true/false; null em caso de erro).
+// idIgnorar: id da própria badge, usado na atualização.
+const ValidarBadge = async (badge, idIgnorar = null) => {
     try {
-        const condicao = []
-        const valores = []
+        if (!badge.nome) return false
 
-        if (badge.nome) {
-            condicao.push('nome = ?')
-            valores.push(badge.nome)
+        let sql = `select id from tbl_badge where nome = ?`
+        const valores = [badge.nome]
+
+        if (idIgnorar) {
+            sql += ` and id <> ?`
+            valores.push(idIgnorar)
         }
-
-        // Sem condições, não executa a consulta
-        if (condicao.length === 0) {
-            return false
-        }
-
-        let sql = `select id from tbl_badge
-            where ${condicao.join(' AND ')}`
 
         const [result] = await knexConex.raw(sql, valores)
 
         return result.length > 0
     } catch (error) {
         console.error('Erro ao validar badge:', error)
-        return false
+        return null
     }
 }
 
@@ -118,6 +145,7 @@ module.exports = {
     CreateBadge,
     UpdateBadge,
     DeleteBadge,
+    GetBadgeById,
     GetBadgeByNome,
     GetAllBadges,
     ValidarBadge

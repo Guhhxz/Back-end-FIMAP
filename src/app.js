@@ -11,6 +11,9 @@ const openFinanceRoutes = require("./routes/openFinanceRoutes")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
+const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
+const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
+const badgeRoutes = require('./routes/badgeRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 
@@ -67,6 +70,9 @@ app.use("/v1", simulacoesRoutes)
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
 app.use("/v1/metas", metasRoutes)
+app.use("/v1/openfinance/seguindo", seguirSeguidoresRoutes)
+app.use("/v1/configuracoes", configuracoesRoutes)
+app.use("/v1/badge", badgeRoutes)
 
 const PORT = process.env.PORT || 8080
 
