@@ -14,6 +14,8 @@ const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
+const configuracoesRoutes = require("./routes/configuracoesRoutes.js")
+const metasRoutes = require("./routes/metasRoutes.js")
 
 const app = express()
 
@@ -57,15 +59,11 @@ app.post('/v1/ia/chat-publico', limitarUsoPublico, chatPublicoController.convers
 // Endpoints do Swagger para consultar e enviar mensagens de um chat
 app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
 app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
-
-
-
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
-
-
 app.use("/v1/openfinance/seguindo", seguir_seguidoresRoutes)
-
+app.use("/v1/configuracoes", configuracoesRoutes)
+app.use("/v1/openfinance", metasRoutes)
 const PORT = process.env.PORT || 8080
 
 const servidor = app.listen(PORT, (erro) => {
