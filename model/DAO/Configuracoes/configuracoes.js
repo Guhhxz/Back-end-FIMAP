@@ -26,7 +26,7 @@ const InsertConfiguracoes = async (idUsuario, configuracoes = {}) => {
             topicos,
             idUsuario
         ])
-        return result.insertId || 0
+        return result?.insertId || 0
     } catch (error) {
         console.error('Erro ao inserir configurações:', error)
         return 0
@@ -44,13 +44,29 @@ const GetConfiguracoesById = async(idUsuario) => {
         return []
     }
 }
+
 const UpdateConfiguracoesById = async(idUsuario, configuracoes) => {
     const sql = `UPDATE tbl_configuracoes 
-    SET notificacao = ?, SET alerta = ?, SET relatorio = ?, SET recomendacao = ?, SET topicos = ?
+    SET notificacao = ?, alerta = ?, relatorio = ?, recomendacao = ?, topicos = ?
     WHERE id_usuario = ?`
 
+    const {
+        notificacao = 0,
+        alerta = 0,
+        relatorio = 0,
+        recomendacao = 0,
+        topicos = 0
+    } = configuracoes
+
     try {
-        const result = await knexConex.raw(sql, [configuracoes, idUsuario])
+        const result = await knexConex.raw(sql, [
+            notificacao,
+            alerta,
+            relatorio,
+            recomendacao,
+            topicos,
+            idUsuario
+        ])
         return result?.[0]?.affectedRows || 0
     } catch (error) {
         console.error('Erro ao atualizar configurações:', error)
@@ -58,7 +74,7 @@ const UpdateConfiguracoesById = async(idUsuario, configuracoes) => {
     }
 }
 
-module.exports = { 
+module.exports = {
     InsertConfiguracoes,
     GetConfiguracoesById,
     UpdateConfiguracoesById
