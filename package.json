@@ -19,8 +19,7 @@
     "wrangler": "^4.151.3"
   },
   "scripts": {
-  "start": "node app.js",
-  "deploy": "wrangler deploy",
-  "preview": "wrangler dev"
+  "start": "node app.js"
+
 }
 }
