@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const codigoOTPModel = require('../../../model/DAO/condigo_OTP/codigo_otp_DAO.js')
 const dispositivoModel = require('../../../model/DAO/Dispositivos/dispositivos.js')
 const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
+const configuracoesModel = require('../../../model/DAO/Configuracoes/configuracoes.js')
 const { enviarOTP } = require('../../config/email.js')
 
 const OTP_VALIDADE_MS = 5 * 60 * 1000
@@ -140,7 +141,20 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
         }
 
-        // 2. cria o código ligado ao usuário
+        const configuracoesCriadas = await configuracoesModel.InsertConfiguracoes(id_usuario, {
+            notificacao: 0,
+            alerta: 0,
+            relatorio: 0,
+            recomendacao: 0,
+            topicos: 0
+        })
+
+        if (!configuracoesCriadas) {
+            await desfazerCadastro(id_usuario)
+            return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
+        }
+
+        // 3. cria o código ligado ao usuário
         const codigo = gerarCodigo()
 
         const id_codigo_otp = await codigoOTPModel.CreateCodigoOTP({
@@ -154,7 +168,7 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return responderErro(res, config_message.ERRO_GERAR_OTP)
         }
 
-        // 3. envia o e-mail; se falhar, apaga tudo
+        // 4. envia o e-mail; se falhar, apaga tudo
         try {
             await enviarOTP(usuario.email, codigo)
         } catch (erroEmail) {

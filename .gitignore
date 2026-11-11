@@ -1,12 +1,6 @@
-# Cloudflare
+# wrangler files
 .wrangler
 .dev.vars*
 !.dev.vars.example
-
-# Secrets
-.env*
 !.env.example
-
-# Dependencies and generated frontend assets
 node_modules/
-frontend-test/assets/vendor/

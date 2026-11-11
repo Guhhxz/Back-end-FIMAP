@@ -1,83 +1,189 @@
-const knex = require('knex')(require('../../Database_config_knex/KnexFile.js').development)
 
-const categorias = 'tbl_categoria_meta'
-const metas = 'tbl_meta_financeira'
-const statusParaCodigo = { em_andamento: 1, concluida: 2, atrasada: 3, cancelada: 4 }
-const codigoParaStatus = Object.fromEntries(Object.entries(statusParaCodigo).map(([status, codigo]) => [codigo, status]))
+const knex = require('knex')
 
-const serializar = (meta) => {
-    if (!meta) return null
-    const valorDesejado = Number(meta.valor_desejado)
-    const valorTotal = Number(meta.valor_total)
-    return {
-        id: meta.id,
-        nome: meta.nome,
-        descricao: meta.descricao,
-        valor_inicio: Number(meta.valor_inicio),
-        valor_desejado: valorDesejado,
-        valor_total: valorTotal,
-        data_alvo: meta.data_alvo,
-        status: codigoParaStatus[meta.status] || 'em_andamento',
-        categoria_id: meta.id_categoria,
-        categoria: meta.categoria_nome ? { id: meta.id_categoria, nome: meta.categoria_nome } : undefined,
-        percentual_progresso: valorDesejado > 0 ? valorTotal / valorDesejado : 0
+const knexConfig = require('../../Database_config_knex/KnexFile.js')
+const knexConex = knex(knexConfig.development)
+
+// Criar meta
+const CreateMeta = async (meta) => {
+    const sql = `
+        INSERT INTO tbl_meta_financeira
+        (
+            nome,
+            descricao,
+            valor_inicio,
+            valor_desejado,
+            valor_total,
+            data_alvo,
+            status,
+            id_categoria,
+            id_usuario
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    try {
+        const [result] = await knexConex.raw(sql, [
+            meta.nome,
+            meta.descricao,
+            meta.valor_inicio,
+            meta.valor_desejado,
+            meta.valor_total,
+            meta.data_alvo,
+            meta.status,
+            meta.id_categoria,
+            meta.id_usuario
+        ])
+
+        return result.insertId
+
+    } catch (error) {
+        console.error('Erro ao criar meta:', error)
+        return false
     }
 }
 
-const consultar = (usuarioId, id) => knex(metas)
-    .leftJoin(`${categorias} as categoria`, 'categoria.id', `${metas}.id_categoria`)
-    .select(`${metas}.id`, `${metas}.nome`, `${metas}.descricao`, `${metas}.valor_inicio`,
-        `${metas}.valor_desejado`, `${metas}.valor_total`, `${metas}.data_alvo`,
-        `${metas}.status`, `${metas}.id_categoria`, 'categoria.nome as categoria_nome')
-    .where(`${metas}.id`, id)
-    .andWhere(`${metas}.id_usuario`, usuarioId)
-    .first()
+// Atualizar meta
+const UpdateMeta = async (meta) => {
+    const camposPermitidos = [
+        'nome',
+        'descricao',
+        'valor_inicio',
+        'valor_desejado',
+        'valor_total',
+        'data_alvo',
+        'status',
+        'id_categoria'
+    ]
 
-const listarCategoriasMeta = () => knex(categorias).select('id', 'nome').orderBy('nome')
+    const camposAtualizados = camposPermitidos.filter(
+        (campo) => meta[campo] !== undefined
+    )
 
-const listarMetas = async (usuarioId, filtros) => {
-    const query = knex(metas)
-        .leftJoin(`${categorias} as categoria`, 'categoria.id', `${metas}.id_categoria`)
-        .select(`${metas}.id`, `${metas}.nome`, `${metas}.descricao`, `${metas}.valor_inicio`,
-            `${metas}.valor_desejado`, `${metas}.valor_total`, `${metas}.data_alvo`,
-            `${metas}.status`, `${metas}.id_categoria`, 'categoria.nome as categoria_nome')
-        .where(`${metas}.id_usuario`, usuarioId)
-    if (filtros.status) query.andWhere(`${metas}.status`, statusParaCodigo[filtros.status])
-    if (filtros.categoriaId) query.andWhere(`${metas}.id_categoria`, filtros.categoriaId)
-    const linhas = await query.orderBy(`${metas}.id`, 'desc')
-        .limit(filtros.tamanho).offset((filtros.pagina - 1) * filtros.tamanho)
-    return linhas.map(serializar)
-}
-
-const criarMeta = async (usuarioId, dados) => {
-    const [id] = await knex(metas).insert({
-        nome: dados.nome.trim(), descricao: dados.descricao ?? null,
-        valor_inicio: dados.valor_inicio ?? 0, valor_desejado: dados.valor_desejado,
-        valor_total: dados.valor_total ?? dados.valor_inicio ?? 0,
-        data_alvo: dados.data_alvo ?? knex.fn.now(), status: statusParaCodigo[dados.status || 'em_andamento'],
-        id_categoria: dados.categoria_id, id_usuario: usuarioId
-    })
-    return serializar(await consultar(usuarioId, id))
-}
-
-const buscarMeta = async (usuarioId, id) => serializar(await consultar(usuarioId, id))
-
-const atualizarMeta = async (usuarioId, id, dados) => {
-    const campos = {
-        nome: dados.nome === undefined ? undefined : dados.nome.trim(),
-        descricao: dados.descricao,
-        valor_inicio: dados.valor_inicio,
-        valor_desejado: dados.valor_desejado,
-        valor_total: dados.valor_total,
-        data_alvo: dados.data_alvo,
-        status: dados.status === undefined ? undefined : statusParaCodigo[dados.status],
-        id_categoria: dados.categoria_id
+    if (camposAtualizados.length === 0) {
+        return false
     }
-    Object.keys(campos).forEach((campo) => campos[campo] === undefined && delete campos[campo])
-    const alterados = await knex(metas).where({ id, id_usuario: usuarioId }).update(campos)
-    return alterados ? buscarMeta(usuarioId, id) : null
+
+    const set = camposAtualizados
+        .map((campo) => `${campo} = ?`)
+        .join(', ')
+
+    const valores = camposAtualizados.map(
+        (campo) => meta[campo]
+    )
+
+    const sql = `
+        UPDATE tbl_meta_financeira
+        SET ${set}
+        WHERE id = ?
+        AND id_usuario = ?
+    `
+
+    try {
+        const [result] = await knexConex.raw(sql, [
+            ...valores,
+            meta.id,
+            meta.id_usuario
+        ])
+
+        return result.affectedRows > 0
+
+    } catch (error) {
+        console.error('Erro ao atualizar meta:', error)
+        return false
+    }
 }
 
-const excluirMeta = (usuarioId, id) => knex(metas).where({ id, id_usuario: usuarioId }).del()
+// Deletar meta
+const DeleteMeta = async (meta) => {
+    const sql = `
+        DELETE FROM tbl_meta_financeira
+        WHERE id = ?
+        AND id_usuario = ?
+    `
 
-module.exports = { listarCategoriasMeta, listarMetas, criarMeta, buscarMeta, atualizarMeta, excluirMeta }
+    try {
+        const [result] = await knexConex.raw(sql, [
+            meta.id,
+            meta.id_usuario
+        ])
+
+        return result.affectedRows > 0
+
+    } catch (error) {
+        console.error('Erro ao deletar meta:', error)
+        return false
+    }
+}
+
+// Buscar todas as metas do usuário
+const GetAllMetasUsuario = async (id_usuario) => {
+    try {
+        return await knexConex('tbl_meta_financeira')
+            .select(
+                'id',
+                'nome',
+                'descricao',
+                'valor_inicio',
+                'valor_desejado',
+                'valor_total',
+                'data_alvo',
+                'status',
+                'id_categoria'
+            )
+            .where('id_usuario', id_usuario)
+            .orderBy('data_alvo', 'asc')
+
+    } catch (error) {
+        console.error('Erro ao listar metas do usuário:', error)
+        return false
+    }
+}
+
+// Buscar todas as categorias de metas do usuário
+const GetAllCategoriasMeta = async (id_usuario) => {
+    try {
+        return await knexConex('tbl_categoria_meta')
+            .select(
+                'id',
+                'nome'
+            )
+
+    } catch (error) {
+        console.error('Erro ao listar categorias do usuário:', error)
+        return false
+    }
+}
+
+// Buscar meta específica do usuário
+const GetMetaById = async (id_usuario, id_meta) => {
+    try {
+        return await knexConex('tbl_meta_financeira')
+            .select(
+                'id',
+                'nome',
+                'descricao',
+                'valor_inicio',
+                'valor_desejado',
+                'valor_total',
+                'data_alvo',
+                'status',
+                'id_categoria'
+            )
+            .where('id_usuario', id_usuario)
+            .andWhere('id', id_meta)
+
+    } catch (error) {
+        console.error('Erro ao buscar meta do usuário:', error)
+        return false
+    }
+}
+
+module.exports = {
+    CreateMeta,
+    UpdateMeta,
+    DeleteMeta,
+    GetAllMetasUsuario,
+    GetAllCategoriasMeta,
+    GetMetaById
+}

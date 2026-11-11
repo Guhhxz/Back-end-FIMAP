@@ -254,6 +254,111 @@ async function listarConexoes(req, res) {
     }
 }
 
+function lerParametrosCartao(req) {
+    return {
+        itemId: req.query.itemId,
+        cartaoId: req.params.cartaoId,
+    }
+}
+
+function responderErroCartao(res, error, contexto, mensagemPadrao) {
+    if (error.status) {
+        return res.status(error.status).json({ erro: error.message })
+    }
+
+    console.error(`Erro ao ${contexto}:`, error)
+    return res.status(500).json({ erro: mensagemPadrao })
+}
+
+function responderSincronizando(res) {
+    return res.status(202).json({
+        mensagem: 'Conexão ainda sincronizando. Tente novamente em alguns segundos.'
+    })
+}
+
+async function obterFaturaCartao(req, res) {
+    try {
+        const { itemId, cartaoId } = lerParametrosCartao(req)
+
+        if (!itemId) {
+            return res.status(400).json({ erro: 'Informe o itemId.' })
+        }
+
+        if (!cartaoId) {
+            return res.status(400).json({ erro: 'Informe o cartaoId.' })
+        }
+
+        const resultado = await pluggyService.obterFaturaCartao(itemId, cartaoId)
+
+        if (resultado.atualizando) {
+            return responderSincronizando(res)
+        }
+
+        return res.status(200).json(resultado)
+    } catch (error) {
+        return responderErroCartao(res, error, 'buscar fatura do cartão', 'Não foi possível buscar a fatura do cartão.')
+    }
+}
+
+async function obterGastosCartao(req, res) {
+    try {
+        const { itemId, cartaoId } = lerParametrosCartao(req)
+        const { periodo = 'fatura-atual' } = req.query
+
+        if (!itemId) {
+            return res.status(400).json({ erro: 'Informe o itemId.' })
+        }
+
+        if (!cartaoId) {
+            return res.status(400).json({ erro: 'Informe o cartaoId.' })
+        }
+
+        // Por enquanto só existe a fatura atual (é o que o design mostra).
+        if (periodo !== 'fatura-atual') {
+            return res.status(400).json({ erro: 'Período inválido. Use "fatura-atual".' })
+        }
+
+        const resultado = await pluggyService.obterGastosCartaoPorCategoria(itemId, cartaoId)
+
+        if (resultado.atualizando) {
+            return responderSincronizando(res)
+        }
+
+        return res.status(200).json(resultado)
+    } catch (error) {
+        return responderErroCartao(res, error, 'buscar gastos por categoria', 'Não foi possível buscar os gastos por categoria.')
+    }
+}
+
+async function obterTransacoesCartao(req, res) {
+    try {
+        const { itemId, cartaoId } = lerParametrosCartao(req)
+        const limite = req.query.limite === undefined ? 20 : Number(req.query.limite)
+
+        if (!itemId) {
+            return res.status(400).json({ erro: 'Informe o itemId.' })
+        }
+
+        if (!cartaoId) {
+            return res.status(400).json({ erro: 'Informe o cartaoId.' })
+        }
+
+        if (!Number.isInteger(limite) || limite < 1 || limite > 100) {
+            return res.status(400).json({ erro: 'O limite deve ser um inteiro entre 1 e 100.' })
+        }
+
+        const resultado = await pluggyService.listarTransacoesCartao(itemId, cartaoId, limite)
+
+        if (resultado.atualizando) {
+            return responderSincronizando(res)
+        }
+
+        return res.status(200).json(resultado)
+    } catch (error) {
+        return responderErroCartao(res, error, 'buscar transações do cartão', 'Não foi possível buscar as transações do cartão.')
+    }
+}
+
 
 module.exports = { 
     gerarConnectToken, 
@@ -265,6 +370,9 @@ module.exports = {
     obterTransacoes,
     obterResumosBancario,
     adicionarConexao,
-    listarConexoes
+    listarConexoes,
+    obterFaturaCartao,
+    obterGastosCartao,
+    obterTransacoesCartao
 }
 
