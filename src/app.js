@@ -17,9 +17,6 @@ const badgeRoutes = require('./routes/badgeRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
-const configuracoesRoutes = require("./routes/configuracoesRoutes.js")
-const metasRoutes = require("./routes/metasRoutes.js")
-const badgeRoutes = require("./routes/badgeRoutes.js")
 
 const app = express()
 
