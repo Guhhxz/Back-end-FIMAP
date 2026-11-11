@@ -476,6 +476,183 @@ const listarEvolucaoInvestimentos = async (itemId, periodo) => {
 // EMPRÉSTIMOS
 // ============================================
 
+// ============================================
+// EMPRÉSTIMOS
+// ============================================
+
+// Regra de negócio própria do Fimap (NÃO vem da Pluggy/Open Finance).
+// Ajuste conforme a política comercial de antecipação que vocês definirem.
+const DESCONTO_ANTECIPACAO_PADRAO_PERCENTUAL = 12
+
+const MESES_POR_PERIODICIDADE = {
+    MONTHLY: 1,
+    BIMONTHLY: 2,
+    QUARTERLY: 3,
+    SEMESTERLY: 6,
+    YEARLY: 12,
+}
+
+const somarMesesData = (data, quantidade) => {
+    const alvo = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth() + quantidade, 1))
+    const ultimoDia = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate()
+    alvo.setUTCDate(Math.min(data.getUTCDate(), ultimoDia))
+    return alvo
+}
+
+// Calcula a data da parcela de número (indiceZeroBased + 1) a partir da primeira parcela.
+// Só sabe calcular periodicidades "em meses". Pra semanal/quinzenal/sem periodicidade
+// regular, devolve a data da primeira parcela mesmo (não tem como fazer melhor com o
+// que a Pluggy manda).
+const calcularDataParcela = (dataPrimeiraParcela, periodicidade, indiceZeroBased) => {
+    if (!dataPrimeiraParcela) return null
+
+    const meses = MESES_POR_PERIODICIDADE[periodicidade]
+    if (!meses) return new Date(dataPrimeiraParcela)
+
+    return somarMesesData(new Date(dataPrimeiraParcela), meses * indiceZeroBased)
+}
+
+// A Pluggy devolve a taxa de juros em `interestRates[]`, não como um único número.
+// Procura primeiro uma taxa pré-fixada mensal; na ausência dela, converte a anual p/ mensal.
+const calcularTaxaJurosMensal = (interestRates) => {
+    if (!Array.isArray(interestRates) || interestRates.length === 0) return null
+
+    const mensal = interestRates.find(
+        (taxa) => taxa.taxPeriodicity === 'MONTHLY' && numeroOuNull(taxa.preFixedRate) !== null
+    )
+    if (mensal) return Math.round(numeroOuNull(mensal.preFixedRate) * 100 * 10000) / 10000
+
+    const anual = interestRates.find(
+        (taxa) => taxa.taxPeriodicity === 'YEARLY' && numeroOuNull(taxa.preFixedRate) !== null
+    )
+    if (anual) {
+        const taxaAnual = numeroOuNull(anual.preFixedRate)
+        const taxaMensalEquivalente = Math.pow(1 + taxaAnual, 1 / 12) - 1
+        return Math.round(taxaMensalEquivalente * 100 * 10000) / 10000
+    }
+
+    // Só existe taxa pós-fixada (indexada) — não dá pra resumir num único percentual.
+    return null
+}
+
+// A Pluggy não devolve status pronto pro empréstimo — infere a partir do saldo
+// devedor, da data de liquidação e das parcelas em atraso.
+const calcularStatusEmprestimo = (emprestimo) => {
+    const parcelas = emprestimo.installments ?? {}
+    const saldoDevedor = numeroOuNull(emprestimo.payments?.contractOutstandingBalance)
+
+    if (emprestimo.settlementDate || saldoDevedor === 0 || parcelas.dueInstallments === 0) {
+        return 'QUITADO'
+    }
+
+    if ((numeroOuNull(parcelas.pastDueInstallments) ?? 0) > 0) {
+        return 'INADIMPLENTE'
+    }
+
+    return 'ATIVO'
+}
+
+const LIMITE_MAXIMO_PARCELAS_GERADAS = 600
+
+const construirCronogramaParcelas = (emprestimo) => {
+    const infoParcelas = emprestimo.installments ?? {}
+
+    const releases = [...(emprestimo.payments?.releases ?? [])].sort(
+        (a, b) => new Date(a.paidDate) - new Date(b.paidDate)
+    )
+
+    const parcelasPagasAgregado = numeroOuNull(infoParcelas.paidInstallments) ?? releases.length
+    const parcelasRestantesAgregado = numeroOuNull(infoParcelas.dueInstallments) ?? 0
+    const totalCalculado = parcelasPagasAgregado + parcelasRestantesAgregado
+    const totalBruto = numeroOuNull(infoParcelas.totalNumberOfInstallments)
+
+    // `totalNumberOfInstallments` é o campo que a Pluggy manda pronto, mas pra esse
+    // empréstimo ele veio MUITO diferente de "pagas + restantes" (o caso dos 10000).
+    // Isso é sinal de dado inconsistente vindo da instituição/sandbox — então a gente
+    // NUNCA usa esse campo cru pra gerar linhas. Usa a soma dos agregados (que são os
+    // mesmos números já exibidos como "16 pagas, 8 restantes") e ainda trava num teto.
+    if (totalBruto !== null && totalBruto !== totalCalculado) {
+        console.warn(
+            `[emprestimos] totalNumberOfInstallments (${totalBruto}) inconsistente com ` +
+            `paidInstallments+dueInstallments (${totalCalculado}) no empréstimo ${emprestimo.id}. ` +
+            `Usando o valor calculado.`
+        )
+    }
+
+    const totalParcelas = Math.min(totalCalculado, LIMITE_MAXIMO_PARCELAS_GERADAS)
+
+    const pagas = releases.slice(0, totalParcelas).map((release, indice) => ({
+        numero: indice + 1,
+        vencimento: release.paidDate,
+        valor: numeroOuNull(release.paidAmount) ?? 0,
+        status: release.isOverParcelPayment ? 'AMORTIZADA' : 'PAGA',
+        dataPagamento: release.paidDate,
+    }))
+
+    const ultimaRegularPaga = [...releases].reverse().find((release) => !release.isOverParcelPayment)
+    const valorParcelaPadrao =
+        numeroOuNull(ultimaRegularPaga?.paidAmount) ??
+        (totalParcelas > 0 ? (numeroOuNull(emprestimo.contractAmount) ?? 0) / totalParcelas : null)
+
+    const pendentes = []
+    for (let numero = pagas.length + 1; numero <= totalParcelas; numero += 1) {
+        const vencimento = calcularDataParcela(
+            emprestimo.firstInstallmentDueDate,
+            emprestimo.installmentPeriodicity,
+            numero - 1
+        )
+
+        pendentes.push({
+            numero,
+            vencimento: vencimento ? vencimento.toISOString() : emprestimo.dueDate,
+            valor: valorParcelaPadrao ?? 0,
+            status: 'PENDENTE',
+            dataPagamento: null,
+        })
+    }
+
+    return {
+        totalParcelas,
+        valorParcelaPadrao,
+        parcelas: [...pagas, ...pendentes],
+    }
+}
+
+const mapearEmprestimo = (emprestimo) => {
+    const pagamentos = emprestimo.payments ?? {}
+    const infoParcelas = emprestimo.installments ?? {}
+    const { valorParcelaPadrao } = construirCronogramaParcelas(emprestimo)
+
+    return {
+        id: emprestimo.id,
+        nome: emprestimo.productName,
+        tipo: emprestimo.type,
+        modalidade: emprestimo.kind,
+
+        valorContratado: numeroOuNull(emprestimo.contractAmount),
+        saldoDevedor: numeroOuNull(pagamentos.contractOutstandingBalance),
+        moeda: emprestimo.currencyCode,
+        vencimento: emprestimo.dueDate ?? null,
+
+        parcelasPagas: numeroOuNull(infoParcelas.paidInstallments),
+        parcelasRestantes: numeroOuNull(infoParcelas.dueInstallments),
+        parcelaMensal: valorParcelaPadrao,
+
+        status: calcularStatusEmprestimo(emprestimo),
+        taxaJurosMensal: calcularTaxaJurosMensal(emprestimo.interestRates),
+
+        proximoVencimento:
+            calcularDataParcela(
+                emprestimo.firstInstallmentDueDate,
+                emprestimo.installmentPeriodicity,
+                numeroOuNull(infoParcelas.paidInstallments) ?? 0
+            )?.toISOString() ?? null,
+
+        // Regra de negócio própria — não vem da Pluggy. Ver constante no topo do arquivo.
+        descontoAntecipacaoPercentual: DESCONTO_ANTECIPACAO_PADRAO_PERCENTUAL,
+    }
+}
+
 const listarEmprestimos = async (itemId) => {
     if (await verificarSincronizacao(itemId)) {
         return {
@@ -485,55 +662,77 @@ const listarEmprestimos = async (itemId) => {
     }
 
     const resposta = await pluggy.fetchLoans(itemId)
-
-    const emprestimos = obterResultados(resposta).map(
-        (emprestimo) => {
-            const pagamentos = emprestimo.payments ?? {}
-            const parcelas = emprestimo.installments ?? {}
-
-            return {
-                id: emprestimo.id,
-                nome: emprestimo.productName,
-                tipo: emprestimo.type,
-                modalidade: emprestimo.kind,
-
-                valorContratado: numeroOuNull(
-                    emprestimo.contractAmount
-                ),
-
-                saldoDevedor: numeroOuNull(
-                    pagamentos.contractOutstandingBalance,
-                    emprestimo.contractOutstandingBalance,
-                    emprestimo.outstandingBalance
-                ),
-
-                moeda: emprestimo.currencyCode,
-                vencimento: emprestimo.dueDate ?? null,
-
-                parcelasPagas: numeroOuNull(
-                    parcelas.paidInstallments
-                ),
-
-                parcelasRestantes: numeroOuNull(
-                    parcelas.dueInstallments
-                ),
-
-                parcelaMensal: numeroOuNull(
-                    emprestimo.installmentAmount,
-                    emprestimo.installmentValue,
-                    pagamentos.installmentAmount,
-                    pagamentos.installmentValue
-                ),
-
-                status: emprestimo.status ?? null,
-            }
-        }
-    )
+    const emprestimos = obterResultados(resposta).map(mapearEmprestimo)
 
     return {
         atualizando: false,
         total: emprestimos.length,
         emprestimos,
+    }
+}
+
+const buscarEmprestimoBruto = async (itemId, emprestimoId) => {
+    let emprestimo
+
+    try {
+        emprestimo = await pluggy.fetchLoan(emprestimoId)
+    } catch (error) {
+        console.error('Erro ao buscar empréstimo no Pluggy:', error)
+        throw erroHttp(404, 'Empréstimo não encontrado.')
+    }
+
+    if (!emprestimo || emprestimo.itemId !== itemId) {
+        throw erroHttp(404, 'Empréstimo não encontrado.')
+    }
+
+    return emprestimo
+}
+
+const LIMITE_PAGAS_PADRAO = 10
+const LIMITE_PAGAS_MAXIMO = 50
+
+const obterDetalheEmprestimo = async (itemId, emprestimoId, opcoes = {}) => {
+    if (await verificarSincronizacao(itemId)) {
+        return { atualizando: true }
+    }
+
+    const emprestimoBruto = await buscarEmprestimoBruto(itemId, emprestimoId)
+    const { totalParcelas, parcelas } = construirCronogramaParcelas(emprestimoBruto)
+
+    const pendentes = parcelas.filter((p) => p.status === 'PENDENTE')
+    const amortizadas = parcelas.filter((p) => p.status === 'AMORTIZADA')
+    const pagas = parcelas
+        .filter((p) => p.status === 'PAGA')
+        .sort((a, b) => b.numero - a.numero) // mais recente primeiro
+
+    const limite = Math.min(
+        Math.max(numeroOuNull(opcoes.limitePagas) ?? LIMITE_PAGAS_PADRAO, 1),
+        LIMITE_PAGAS_MAXIMO
+    )
+    const pagasVisiveis = pagas.slice(0, limite)
+    const pagasRestantes = pagas.slice(limite)
+
+    return {
+        atualizando: false,
+        emprestimo: mapearEmprestimo(emprestimoBruto),
+        totalParcelas,
+        pendentes,
+        amortizadas,
+        pagas: {
+            itens: pagasVisiveis,
+            limite,
+            total: pagas.length,
+            temMais: pagasRestantes.length > 0,
+            resumoRestante:
+                pagasRestantes.length > 0
+                    ? {
+                          quantidade: pagasRestantes.length,
+                          valorTotal: Math.round(pagasRestantes.reduce((soma, p) => soma + p.valor, 0) * 100) / 100,
+                          numeroInicial: Math.min(...pagasRestantes.map((p) => p.numero)),
+                          numeroFinal: Math.max(...pagasRestantes.map((p) => p.numero)),
+                      }
+                    : null,
+        },
     }
 }
 
@@ -626,5 +825,7 @@ module.exports = {
     obterGastosCartaoPorCategoria,
     listarTransacoesCartao,
     verificarSincronizacao,
-    listarEvolucaoInvestimentos
+    listarEvolucaoInvestimentos,
+    listarEmprestimos,
+    obterDetalheEmprestimo
 }

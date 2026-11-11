@@ -12,7 +12,6 @@ const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
  * Roda sequencial, com uma pequena pausa entre conexões, pra não estourar rate limit do Pluggy.
  */
 const executarSnapshotDiario = async () => {
-    console.log('[snapshot-investimentos] Iniciando job diário...')
 
     const conexoes = await conexaoDAO.listarTodasConexoesAtivas()
     let sucesso = 0
@@ -32,8 +31,6 @@ const executarSnapshotDiario = async () => {
 
         await esperar(PAUSA_ENTRE_CONEXOES_MS)
     }
-
-    console.log(`[snapshot-investimentos] Concluído: ${sucesso} ok, ${falhas} falhas, ${conexoes.length} total.`)
 }
 
 // Todo dia às 06:00 (horário do servidor). Ajuste a expressão cron se quiser outro horário.
@@ -43,8 +40,6 @@ const agendar = () => {
             console.error('[snapshot-investimentos] Erro inesperado no job:', error)
         })
     })
-
-    console.log('[snapshot-investimentos] Job agendado para rodar todo dia às 06:00.')
 }
 
 module.exports = { agendar, executarSnapshotDiario }

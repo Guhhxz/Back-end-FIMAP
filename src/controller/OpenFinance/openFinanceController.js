@@ -162,6 +162,40 @@ async function obterEmprestimos(req, res) {
     }
 }
 
+const obterEmprestimoPorId = async (req, res) => {
+    try {
+        const { itemId, emprestimoId } = req.params
+        const resultado = await pluggyService.buscarEmprestimo(itemId, emprestimoId)
+        res.status(200).json(resultado)
+    } catch (error) {
+        console.error('Erro ao obter empréstimo:', error)
+        res.status(error.status ?? 500).json({ mensagem: error.message ?? 'Erro ao obter o empréstimo.' })
+    }
+}
+
+const obterParcelasEmprestimo = async (req, res) => {
+    try {
+        const { itemId, emprestimoId } = req.params
+        const resultado = await pluggyService.listarParcelasEmprestimo(itemId, emprestimoId)
+        res.status(200).json(resultado)
+    } catch (error) {
+        console.error('Erro ao obter parcelas do empréstimo:', error)
+        res.status(error.status ?? 500).json({ mensagem: error.message ?? 'Erro ao obter as parcelas do empréstimo.' })
+    }
+}
+
+const obterDetalheEmprestimo = async (req, res) => {
+    try {
+        const { itemId, emprestimoId } = req.params
+        const { limitePagas } = req.query
+        const resultado = await pluggyService.obterDetalheEmprestimo(itemId, emprestimoId, { limitePagas })
+        res.status(200).json(resultado)
+    } catch (error) {
+        console.error('Erro ao obter detalhe do empréstimo:', error)
+        res.status(error.status ?? 500).json({ mensagem: error.message ?? 'Erro ao obter o detalhe do empréstimo.' })
+    }
+}
+
 
 async function obterTransacoes(req, res) {
     try {
@@ -394,6 +428,9 @@ module.exports = {
     obterFaturaCartao,
     obterGastosCartao,
     obterTransacoesCartao,
-    obterEvolucaoInvestimentos
+    obterEvolucaoInvestimentos,
+    obterEmprestimoPorId,
+    obterParcelasEmprestimo,
+    obterDetalheEmprestimo
 }
 

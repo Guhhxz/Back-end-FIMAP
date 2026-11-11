@@ -79,6 +79,7 @@ const servidor = app.listen(PORT, (erro) => {
         process.exit(1)
     }
     console.log(`Servidor rodando na porta ${PORT}`)
+    investimentoSnapshotJob.agendar()
 })
 
 
