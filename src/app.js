@@ -16,6 +16,7 @@ const chatPublicoController = require("./controller/MensagemChat/PublicChatContr
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 const configuracoesRoutes = require("./routes/configuracoesRoutes.js")
 const metasRoutes = require("./routes/metasRoutes.js")
+const badgeRoutes = require("./routes/badgeRoutes.js")
 
 const app = express()
 
@@ -64,6 +65,7 @@ app.use("/v1/openfinance/usuario", usuarioRoutes)
 app.use("/v1/openfinance/seguindo", seguir_seguidoresRoutes)
 app.use("/v1/configuracoes", configuracoesRoutes)
 app.use("/v1/openfinance/metas", metasRoutes)
+app.use("/v1/badge", badgeRoutes)
 const PORT = process.env.PORT || 8080
 
 const servidor = app.listen(PORT, (erro) => {
