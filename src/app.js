@@ -18,6 +18,9 @@ const mensagemChatController = require("./controller/MensagemChat/MensagemChatCo
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 
+//exportanto jobs
+const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
+
 const app = express()
 
 const corsOption = {
@@ -77,6 +80,8 @@ const servidor = app.listen(PORT, (erro) => {
     }
     console.log(`Servidor rodando na porta ${PORT}`)
 })
+
+
 
 servidor.on("error", (erro) => {
     console.error("Erro no servidor:", erro)

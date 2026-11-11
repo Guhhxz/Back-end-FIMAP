@@ -11,6 +11,7 @@
     "knex": "^3.3.0",
     "mysql": "^2.18.1",
     "mysql2": "^3.24.6",
+    "node-cron": "^4.6.0",
     "nodemailer": "^10.2.1",
     "pluggy-sdk": "^0.92.0"
   },
@@ -19,8 +20,8 @@
     "wrangler": "^4.151.3"
   },
   "scripts": {
-  "start": "node app.js",
-  "deploy": "wrangler deploy",
-  "preview": "wrangler dev"
-}
+    "start": "node app.js",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
+  }
 }

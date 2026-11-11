@@ -74,8 +74,22 @@ const buscarConexaoPorId = async (id) => {
     }
 }
 
+// Listar todas as conexões ativas (de todos os usuários) — usado pelo job de snapshot diário
+const listarTodasConexoesAtivas = async () => {
+    const sql = `SELECT external_connection_id FROM tbl_conexao_open_finance WHERE status = 1`
+
+    try {
+        const [result] = await knexConex.raw(sql)
+        return result || []
+    } catch (error) {
+        console.error('Erro ao listar todas as conexões ativas:', error)
+        return []
+    }
+}
+
 module.exports = {
     criarConexao,
     listarConexoesPorUsuario,
-    buscarConexaoPorId
+    buscarConexaoPorId,
+    listarTodasConexoesAtivas
 }
