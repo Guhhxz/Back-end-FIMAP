@@ -119,6 +119,26 @@ async function obterInvestimentos(req, res) {
     }
 }
 
+async function obterEvolucaoInvestimentos(req, res) {
+    try {
+        const { itemId } = req.params
+        const { periodo = "1a" } = req.query
+
+        if (!itemId) {
+            return res.status(400).json({ erro: "Informe o itemId." })
+        }
+
+        const resultado = await pluggyService.listarEvolucaoInvestimentos(itemId, periodo)
+        return res.status(200).json(resultado)
+    } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ erro: error.message })
+        }
+        console.error("Erro ao buscar evolução de investimentos:", error)
+        return res.status(500).json({ erro: "Não foi possível buscar a evolução dos investimentos." })
+    }
+}
+
 async function obterEmprestimos(req, res) {
     try {
         const { itemId } = req.params
@@ -373,6 +393,7 @@ module.exports = {
     listarConexoes,
     obterFaturaCartao,
     obterGastosCartao,
-    obterTransacoesCartao
+    obterTransacoesCartao,
+    obterEvolucaoInvestimentos
 }
 

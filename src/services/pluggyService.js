@@ -3,7 +3,7 @@ const pluggy = require("../config/pluggy")
 const conexaoDAO = require("../../model/DAO/OpenFinance/conexaoOpenFinanceDAO.js")
 const MS_DIA = 24 * 60 * 60 * 1000
 const MAXIMO_CATEGORIAS_PADRAO = 4
-
+const investimentoSnapshotDAO = require("../../model/DAO/OpenFinance/investimentoSnapshotDAO.js")
 const numeroOuNull = (...valores) => {
     for (const valor of valores) {
         if (valor === undefined || valor === null || valor === "") {
@@ -408,22 +408,67 @@ const listarInvestimentos = async (itemId) => {
             tipo: investimento.type,
             subtipo: investimento.subtype,
             valor: numeroOuNull(
-                investimento.value,
                 investimento.balance,
+                investimento.value,
                 investimento.amount
             ) ?? 0,
             moeda: investimento.currencyCode,
+
             instituicao:
                 investimento.institution?.name ??
                 investimento.institutionName ??
                 null,
+
+            // Identificação do ativo
+            codigo: investimento.code ?? null,
+            emissor: investimento.issuer ?? null,
+
+            // Posição
+            quantidade: numeroOuNull(investimento.quantity),
+            valorAplicado: numeroOuNull(investimento.amountOriginal),
+            lucro: numeroOuNull(investimento.amountProfit),
+
+            // Rentabilidade
+            taxa: numeroOuNull(investimento.rate),
+            tipoTaxa: investimento.rateType ?? null,
+            taxaAnual: numeroOuNull(investimento.annualRate, investimento.fixedAnnualRate),
+            rendimentoUltimoMes: numeroOuNull(investimento.lastMonthRate),
+            rendimentoUltimos12Meses: numeroOuNull(investimento.lastTwelveMonthsRate),
+
+            // Datas
+            vencimento: paraData(investimento.dueDate),
+            dataSaldo: paraData(investimento.date),
         })
     )
+
+    const valorTotal = investimentos.reduce((soma, i) => soma + (i.valor || 0), 0)
+    try {
+        await investimentoSnapshotDAO.registrarSnapshot(itemId, valorTotal)
+    } catch (error) {
+        console.error("Erro ao registrar snapshot de investimentos:", error)
+    }
 
     return {
         atualizando: false,
         total: investimentos.length,
         investimentos,
+    }
+}
+
+const PERIODOS_VALIDOS = ["1m", "6m", "1a", "tudo"]
+
+const listarEvolucaoInvestimentos = async (itemId, periodo) => {
+    if (!PERIODOS_VALIDOS.includes(periodo)) {
+        throw erroHttp(400, "Período inválido. Use 1m, 6m, 1a ou tudo.")
+    }
+
+    const linhas = await investimentoSnapshotDAO.listarPorPeriodo(itemId, periodo)
+
+    return {
+        evolucao: linhas.map((l) => ({
+            data: l.data instanceof Date ? l.data.toISOString().slice(0, 10) : l.data,
+            valor: Number(l.valor_total),
+        })),
     }
 }
 
@@ -580,5 +625,6 @@ module.exports = {
     obterFaturaCartao,
     obterGastosCartaoPorCategoria,
     listarTransacoesCartao,
-    verificarSincronizacao
+    verificarSincronizacao,
+    listarEvolucaoInvestimentos
 }
