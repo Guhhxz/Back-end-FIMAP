@@ -141,7 +141,6 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
         }
 
-        // 2. cria as configurações padrão do usuário com todos os valores em zero
         const configuracoesCriadas = await configuracoesModel.InsertConfiguracoes(id_usuario, {
             notificacao: 0,
             alerta: 0,
@@ -150,7 +149,6 @@ const criarCodigoOTPUsuario = async (req, res) => {
             topicos: 0
         })
 
-        
         if (!configuracoesCriadas) {
             await desfazerCadastro(id_usuario)
             return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
