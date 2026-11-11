@@ -167,7 +167,6 @@ module.exports = {
     CreateNotificacao,
     GetNotificacaoById,
     GetNotificacoesByUsuario,
-    CountNaoLidas,
     MarcarComoLida,
     MarcarTodasComoLidas,
     DeleteNotificacao,
