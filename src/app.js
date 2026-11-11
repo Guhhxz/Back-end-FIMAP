@@ -11,12 +11,12 @@ const openFinanceRoutes = require("../src/routes/openFinanceRoutes.js")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
-const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
+const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
 
 const app = express()
 
@@ -68,6 +68,9 @@ app.use("/v1/openfinance/seguindo", seguir_seguidoresRoutes)
 app.use("/v1/configuracoes", configuracoesRoutes)
 app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
+app.use("/v1/simulacoes", simulacoesRoutes)
+app.use("/v1/notificacoes", notificacaoRoutes)
+
 const PORT = process.env.PORT || 8080
 
 const servidor = app.listen(PORT, (erro) => {
