@@ -1,0 +1,65 @@
+﻿// PARA QUE SERVE ESTE ARQUIVO
+//
+// Este arquivo reÃºne as escolhas usadas para abrir ou publicar a IA junto
+// com a pÃ¡gina de teste na Cloudflare. Ele informa o nome do projeto,
+// o programa que deve receber os pedidos e onde estÃ£o os arquivos da pÃ¡gina.
+//
+// O programa escolhido Ã© src/testUiWorker.ts. Os arquivos que aparecem
+// no navegador ficam em frontend-test. A parte de IA continua sendo
+// atendida pelo programa principal do projeto.
+//
+// QUANDO Ã‰ USADO
+// Ã‰ lido pelo comando npm run ui:deploy.
+// O comando npm run deploy usa wrangler.jsonc, que Ã© a escolha normal
+// para publicar somente a IA, sem a pÃ¡gina de teste.
+//
+// ATENÃ‡ÃƒO AO PUBLICAR
+// Este arquivo aponta para o mesmo projeto back-end-fimap. Publicar com
+// ui:deploy atualiza esse projeto com a pÃ¡gina de teste incluÃ­da; nÃ£o cria
+// sozinho um site separado. O nome do perfil e a conta usada no login
+// determinam em qual conta a publicaÃ§Ã£o serÃ¡ feita.
+//
+// SE ESTE ARQUIVO FOR APAGADO
+// O comando ui:deploy precisa ser retirado ou ajustado.
+// A publicaÃ§Ã£o normal da IA nÃ£o depende deste arquivo.
+
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Nome do projeto que serÃ¡ atualizado na conta escolhida.
+  "name": "back-end-fimap-novop",
+  "workers_dev": true,
+  "preview_urls": false,
+  // Programa que separa os pedidos da pÃ¡gina e os pedidos para a IA.
+  "main": "src/testUiWorker.ts",
+  // Data que mantÃ©m as regras de execuÃ§Ã£o esperadas por este projeto.
+  "compatibility_date": "2026-10-21",
+  // Permite que o programa use o serviÃ§o de IA da Cloudflare.
+  "ai": {
+    "binding": "AI"
+  },
+  // Indica onde ficam os arquivos que serÃ£o mostrados no navegador.
+  "assets": {
+    "directory": "./frontend-test",
+    "binding": "ASSETS",
+    // Estes pedidos passam primeiro pelo programa que atende a IA.
+    "run_worker_first": [
+      "/v1/ia/*",
+      "/chat",
+      "/health"
+    ]
+  },
+  // Limita a quantidade de pedidos para evitar uso excessivo.
+  "ratelimits": [
+    {
+      "name": "CHAT_RATE_LIMITER",
+      // IdentificaÃ§Ã£o usada para contar os pedidos desse limite.
+      "namespace_id": "73918426",
+      // Permite atÃ© 12 pedidos por minuto para cada endereÃ§o de acesso.
+      "simple": {
+        "limit": 12,
+        "period": 60
+      }
+    }
+  ]
+}
+

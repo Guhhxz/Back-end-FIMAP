@@ -5,12 +5,15 @@ require("dotenv").config({
 
 const express = require("express")
 const cors = require("cors")
-const path = require("path")
 
 // Importando rotas e controllers
 const openFinanceRoutes = require("../src/routes/openFinanceRoutes.js")
 const usuarioRoutes = require("./routes/usuarioRoutes.js")
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
+const metasRoutes = require('./routes/metasRoutes.js')
+const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
+const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
+const badgeRoutes = require('./routes/badgeRoutes.js')
 const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
@@ -27,10 +30,9 @@ const corsOption = {
 }
 
 app.use(cors(corsOption))
-app.use(express.json({ limit: "32kb" }))
+app.use(express.json({ limit: "192kb" }))
 app.use(express.urlencoded({ extended: true }))
 
-app.get("/", (req, res) => res.sendFile(path.resolve(__dirname, "../index.html")))
 app.get("/health", (req, res) => res.status(200).json({ online: true, servico: "fimap-api" }))
 
 // Permite uma pergunta por IP a cada cinco segundos.
@@ -53,6 +55,9 @@ const limitarUsoPublico = (req, res, next) => {
         return res.status(429).json({ mensagem: `Aguarde ${segundos} segundo(s) antes de enviar outra pergunta.` })
     }
     ultimaPerguntaPorIp.set(ip, agora)
+    res.once('close', () => {
+        if (!res.writableEnded && ultimaPerguntaPorIp.get(ip) === agora) ultimaPerguntaPorIp.delete(ip)
+    })
     return next()
 }
 

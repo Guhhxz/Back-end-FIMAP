@@ -1,8 +1,11 @@
-﻿export interface Env {
-  AI: Ai;
-  CHAT_RATE_LIMITER: RateLimit;
-  ASSETS: Fetcher;
-}
+import presentationPrompt from "./ai-presentation-prompt.js";
+import systemPrompt from "./ai-system-prompt.js";
+import financialChat from "./services/financial/financialChatOrchestrator.js";
+export type Env = Cloudflare.Env & {
+  HG_BRASIL_API_KEY?: string;
+  BRAPI_TOKEN?: string;
+  FINANCIAL_TOOLS_ENABLED?: string;
+};
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { 
@@ -20,7 +23,7 @@ export default {
     const rotaChatPublico = url.pathname === "/v1/ia/chat-publico";
     const rotaLegada = url.pathname === "/chat";
     if ((rotaChatPublico || rotaLegada) && request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-    if (request.method !== "POST" || (!rotaChatPublico && !rotaLegada)) return env.ASSETS.fetch(request);
+    if (request.method !== "POST" || (!rotaChatPublico && !rotaLegada)) return json({ mensagem: "Rota não encontrada." }, 404);
 
     // 1. BLOCO NOVO: Libera o CORS para o seu HTML fazer a requisição sem ser bloqueado
     if (request.method === "OPTIONS") {
@@ -61,11 +64,16 @@ export default {
       if (!item || typeof item !== "object") return false;
       const mensagem = item as { role?: unknown; content?: unknown };
       const papeisPermitidos = rotaLegada ? ["system", "user", "assistant"] : ["user", "assistant"];
-      return papeisPermitidos.includes(String(mensagem.role)) && typeof mensagem.content === "string" && mensagem.content.trim().length > 0 && mensagem.content.length <= 2000;
+      // O backend envia o prompt compartilhado completo na rota legada.
+      // Apenas essas versões conhecidas podem ultrapassar o limite comum.
+      const promptCompartilhado = rotaLegada && mensagem.role === "system" &&
+        (mensagem.content === systemPrompt || mensagem.content === systemPrompt + "\n" + presentationPrompt);
+      return papeisPermitidos.includes(String(mensagem.role)) && typeof mensagem.content === "string" && mensagem.content.trim().length > 0 &&
+        (promptCompartilhado || mensagem.content.length <= (mensagem.role === "assistant" ? 16000 : 2000));
     });
     if (!validas) return json({ mensagem: "Mensagem inválida ou maior que 2000 caracteres." }, 400);
 
-    const mensagens = rotaChatPublico ? [{ role: "system", content: systemPrompt }, ...body.messages] : body.messages;
+    const mensagens = rotaChatPublico ? [{ role: "system", content: systemPrompt + "\n" + presentationPrompt }, ...body.messages] : body.messages;
     try {
       const stream = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
         messages: mensagens as Array<{ role: "system" | "user" | "assistant"; content: string }>,
@@ -83,7 +91,7 @@ export default {
         },
       });
     } catch (error) {
-      console.error("Workers AI falhou:", error);
+      console.error("Workers AI falhou ao gerar a resposta.");
       return json({ mensagem: "A Cloudflare não conseguiu gerar a resposta." }, 502);
     }
   },
