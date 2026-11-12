@@ -1,4 +1,4 @@
-// Importando as dependências
+﻿// Importando as dependências
 require("dotenv").config({
     path: require("path").resolve(__dirname, "../.env")
 })
@@ -13,8 +13,7 @@ const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
-// const mensagemChatController = require("./controller/MensagemChat/MensagemChatController.js")
-const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
+const chatRoutes = require("./routes/chatRoutes.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
 
@@ -35,9 +34,10 @@ app.use(express.urlencoded({ extended: true }))
 // Endpoints do Swagger para consultar e enviar mensagens de um chat
 // app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
 // app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
+app.use("/v1/ia/chat/", chatRoutes)
 app.use("/v1/openfinance", openFinanceRoutes)
 app.use("/v1/openfinance/usuario", usuarioRoutes)
-app.use("/v1/openfinance/seguindo", seguir_seguidoresRoutes)
+app.use("/v1/seguindo", seguir_seguidoresRoutes)
 app.use("/v1/configuracoes", configuracoesRoutes)
 app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
