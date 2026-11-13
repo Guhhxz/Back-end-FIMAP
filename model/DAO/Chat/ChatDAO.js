@@ -36,7 +36,13 @@ const UpdateChatName = async (id_chat, novo_nome) => {
     return result.affectedRows > 0
 }
 
+const GetAllChats = async () => {
+    const [rows] = await db.raw('select id, nome, data_criacao, id_usuario from tbl_chat;')
+    return rows
+}
+
 module.exports = {
+    GetAllChats,
     insertChat,
     inssertChat: insertChat, // Compatibilidade com chamadas existentes.
     GetChatById,

@@ -23,9 +23,9 @@ const chatRoutes = require("./routes/chatRoutes.js")
 const mensagemChatRoutes = require("./routes/mensagemChatRoutes.js")
 const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
 const limitarChat = require("./middlewares/limitarChat.js")
-const postRoutes = require("./routes/postRoutes.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
+const postRoutes = require("./routes/postRoutes.js")
 
 //exportanto jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
@@ -56,7 +56,7 @@ app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
 app.use("/v1", simulacoesRoutes)
 app.use("/v1/notificacoes", notificacaoRoutes)
-app.use("/v1/comunidade/posts", postRoutes)
+app.use("/v1/posts", postRoutes)
 
 app.use((error, req, res, next) => {
     if (res.headersSent) return next(error)
