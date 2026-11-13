@@ -7,15 +7,16 @@ const express = require("express")
 const cors = require("cors")
 
 // Importando rotas e controllers
-const openFinanceRoutes = require("../src/routes/openFinanceRoutes.js")
-const usuarioRoutes = require("./routes/usuarioRoutes.js")
+const openFinanceRoutes = require('../src/routes/openFinanceRoutes.js')
+const usuarioRoutes = require('./routes/usuarioRoutes.js')
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
-const chatRoutes = require("./routes/chatRoutes.js")
-const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
-const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
+const chatRoutes = require('./routes/chatRoutes.js')
+const seguir_seguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
+const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
+const sessaoRoutes = require('./routes/sessaoRoutes.js')
 
 //exportanto jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
@@ -32,7 +33,9 @@ app.use(cors(corsOption))
 app.use(express.json({ limit: "192kb" }))
 app.use(express.urlencoded({ extended: true }))
 
-
+app.get('/ping', (req, res) => {
+    return res.status(200).json({ status: 'API funcionando no Render!'});
+  });
 
 // Endpoints do Swagger para consultar e enviar mensagens de um chat
 // app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
@@ -46,6 +49,7 @@ app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
 app.use("/v1/simulacoes", simulacoesRoutes)
 app.use("/v1/notificacoes", notificacaoRoutes)
+app.use("/v1/sessao", sessaoRoutes)
 
 const PORT = process.env.PORT || 8080
 
