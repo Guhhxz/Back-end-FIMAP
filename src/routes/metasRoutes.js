@@ -8,6 +8,7 @@ const MetaController = require("../controller/Metas/MetasController.js")
 router.post('/:id_usuario', MetaController.CriarMeta)
 router.put('/:id_usuario/:id', MetaController.AtualizarMeta)
 router.delete('/:id_usuario/:id', MetaController.DeletarMeta)
+router.post('/categorias/:id_usuario', MetaController.CriarCategoria)
 
 // Consultas
 router.get('/:id_usuario', MetaController.ListarMetasUsuario)
