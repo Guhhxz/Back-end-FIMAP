@@ -161,10 +161,28 @@ const ApagarChat = async (req, res) => {
     }
 }
 
+const ListarTodosChats = async (req, res) => {
+    try {
+        const chats = await chatDAO.GetAllChats()
+
+        return res.status(config_message.CHATS_ENCONTRADOS.status).json({
+            sucesso: true,
+            mensagem: config_message.CHATS_ENCONTRADOS.mensagem,
+            quantidade: chats.length,
+            conteudo: chats
+        })
+    } catch (error) {
+        console.error('Erro ao listar todos os chats:', error)
+        return res.status(config_message.ERRO_BUSCAR_CHATS.status)
+            .json({ sucesso: false, mensagem: config_message.ERRO_BUSCAR_CHATS.mensagem })
+    }
+}
+
 module.exports = {
     CriarChat,
     ListarChatsPorUsuario,
     ListaPorId,
     AtualizarNomeChat,
-    ApagarChat
+    ApagarChat,
+    ListarTodosChats
 }

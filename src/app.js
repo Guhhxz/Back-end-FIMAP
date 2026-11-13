@@ -16,6 +16,7 @@ const badgeRoutes = require('./routes/badgeRoutes.js')
 const chatRoutes = require("./routes/chatRoutes.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
+const postRoutes = require("./routes/postRoutes.js")
 
 //exportanto jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
@@ -46,6 +47,7 @@ app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
 app.use("/v1/simulacoes", simulacoesRoutes)
 app.use("/v1/notificacoes", notificacaoRoutes)
+app.use("/v1/posts", postRoutes)
 
 const PORT = process.env.PORT || 8080
 

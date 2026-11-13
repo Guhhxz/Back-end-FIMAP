@@ -16,7 +16,7 @@ const inssertChat = async (nome, id_usuario) => {
 }
 
 const GetChatById = async (id_chat) => {
-    const sql = 'select nome, data_criacao, id_usuario from tbl_chat where id = ?;'
+    const sql = 'select id, nome, data_criacao, id_usuario from tbl_chat where id = ?;'
 
     try {
         const [rows] = await knexConex.raw(sql, [id_chat])
@@ -61,10 +61,25 @@ const UpdateChatName = async (id_chat, novo_nome) => {
         throw error
     }
 }
+
+const GetAllChats = async () => {
+    const sql = 'select id, nome, data_criacao, id_usuario from tbl_chat;'
+
+    try {
+        const [rows] = await knexConex.raw(sql)
+        return rows
+    } catch (error) {
+        console.error("Erro ao buscar todos os chats:", error)
+        throw error
+    }
+} 
+
+
 module.exports = {
     inssertChat,
     GetChatById,
     apagarChat,
     ListChatsByUserId,
-    UpdateChatName
+    UpdateChatName,
+    GetAllChats
 }
