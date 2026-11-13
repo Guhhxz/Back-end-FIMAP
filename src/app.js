@@ -42,7 +42,9 @@ app.use(cors(corsOption))
 app.use(express.json({ limit: "192kb" }))
 app.use(express.urlencoded({ extended: true }))
 
-
+app.get('/ping', (req, res) => {
+    return res.status(200).json({ status: 'API funcionando no Render!' });
+  });
 
 app.get("/health", (req, res) => res.status(200).json({ online: true, servico: "fimap-api" }))
 app.post("/v1/ia/chat-publico", limitarChat, chatPublicoController.conversarPublicamente)
