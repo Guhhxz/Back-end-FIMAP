@@ -253,7 +253,7 @@ async function obterResumosBancario(req, res) {
 async function adicionarConexao(req, res) {
     try {
         const { idUsuario } = req.params
-        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id } = req.body
+        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, nome_instituicao } = req.body
 
         if (!idUsuario) {
             return res.status(400).json({ erro: "Informe o ID do usuário." })
@@ -269,6 +269,7 @@ async function adicionarConexao(req, res) {
             ultima_sincronizacao,
             provedor,
             external_connection_id,
+            nome_instituicao,
             id_usuario: idUsuario
         }
 

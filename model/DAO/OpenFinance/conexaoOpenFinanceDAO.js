@@ -9,8 +9,9 @@ const knexConex = knex(knexConfig.development)
 
 // Criar conexão Open Finance
 const criarConexao = async (conexao) => {
+    console.log(conexao)
     const sql = `INSERT INTO tbl_conexao_open_finance
-        (status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, id_usuario)
+        (status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, nome_instituicao, id_usuario)
         VALUES (?, ?, ?, ?, ?, ?)`
 
     try {
@@ -20,6 +21,7 @@ const criarConexao = async (conexao) => {
             conexao.ultima_sincronizacao ?? null,
             conexao.provedor ?? null,
             conexao.external_connection_id ?? null,
+            conexao.nome_instituicao ?? null,
             conexao.id_usuario
         ])
 
