@@ -350,6 +350,102 @@ const verificarCodigoAlteracaoSenha = async (req, res) => {
     }
 }
 
+// Confere a senha ATUAL do usuário logado (tela "Alterar Senha" em Configurações).
+// Diferente do login: não exige nem registra dispositivo e não devolve dados do usuário.
+const verificarSenhaAtual = async (req, res) => {
+    try {
+        const id_usuario = Number(req.params.id_usuario)
+        const { senha } = req.body || {}
+
+        if (!idValido(id_usuario)) {
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
+        }
+
+        if (!senha) {
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
+        }
+
+        const usuario = await usuarioModel.GetUsuarioById(id_usuario)
+
+        const senhaCorreta = usuario
+            ? await usuarioModel.ValidarSenha(senha, usuario.senha)
+            : false
+
+        // Mesma resposta para usuário inexistente e senha errada
+        if (!senhaCorreta) {
+            return res.status(401).json({
+                sucesso: false,
+                mensagem: 'Senha atual incorreta.'
+            })
+        }
+
+        return res.status(200).json({
+            sucesso: true,
+            mensagem: 'Senha confirmada.'
+        })
+    } catch (error) {
+        console.error('Erro ao verificar senha atual:', error)
+        return responderErro(res, config_message.ERRO_LOGIN)
+    }
+}
+
+// Troca de senha do usuário logado: confere a senha ATUAL e grava a nova numa única chamada.
+// Aqui a prova de identidade é a própria senha atual, por isso não exige OTP.
+const alterarSenhaComSenhaAtual = async (req, res) => {
+    try {
+        const id_usuario = Number(req.params.id_usuario)
+        const { senhaAtual, novaSenha } = req.body || {}
+
+        if (!idValido(id_usuario)) {
+            return responderErro(res, config_message.ID_USUARIO_INVALIDO)
+        }
+
+        if (!senhaAtual || !novaSenha) {
+            return responderErro(res, config_message.CAMPOS_OBRIGATORIOS)
+        }
+
+        if (!senhaValida(novaSenha)) {
+            return responderSenhaCurta(res)
+        }
+
+        const usuario = await usuarioModel.GetUsuarioById(id_usuario)
+
+        const senhaCorreta = usuario
+            ? await usuarioModel.ValidarSenha(senhaAtual, usuario.senha)
+            : false
+
+        // Mesma resposta para usuário inexistente e senha errada
+        if (!senhaCorreta) {
+            return res.status(401).json({
+                sucesso: false,
+                mensagem: 'Senha atual incorreta.'
+            })
+        }
+
+        if (senhaAtual === novaSenha) {
+            return res.status(400).json({
+                sucesso: false,
+                mensagem: 'A nova senha deve ser diferente da atual.'
+            })
+        }
+
+        // Senha em texto puro: o DAO faz o hash
+        const atualizado = await usuarioModel.UpdateUsers({ id_usuario, senha: novaSenha })
+
+        if (!atualizado) {
+            return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
+        }
+
+        return res.status(200).json({
+            sucesso: true,
+            mensagem: 'Senha alterada com sucesso.'
+        })
+    } catch (error) {
+        console.error('Erro ao alterar senha com senha atual:', error)
+        return responderErro(res, config_message.ERRO_ATUALIZAR_USUARIO)
+    }
+}
+
 // Deletar usuário
 const deletarUsuario = async (req, res) => {
     try {
@@ -590,6 +686,8 @@ module.exports = {
     atualizarUsuario,
     solicitarOTPAlteracaoSenha,
     verificarCodigoAlteracaoSenha,
+    verificarSenhaAtual,
+    alterarSenhaComSenhaAtual,
     deletarUsuario,
     buscarUsuarioPorUsername,
     buscarTodosUsuarios,

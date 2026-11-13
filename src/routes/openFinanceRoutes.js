@@ -22,6 +22,8 @@ router.get("/financeiro/cartoes/:cartaoId/fatura", openFinanceController.obterFa
 router.get("/financeiro/cartoes/:cartaoId/gastos-por-categoria", openFinanceController.obterGastosCartao)
 router.get("/financeiro/cartoes/:cartaoId/transacoes", openFinanceController.obterTransacoesCartao)
 router.get("/financeiro/cartoes/:cartaoId/extrato", extratoCartaoController.obterExtratoCartao)
+router.get("/financeiro/investimentos/:itemId/evolucao", openFinanceController.obterEvolucaoInvestimentos)
+router.get("/financeiro/emprestimos/:itemId/:emprestimoId/detalhe", openFinanceController.obterDetalheEmprestimo)
 
 
 module.exports = router
