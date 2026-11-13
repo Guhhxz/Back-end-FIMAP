@@ -13,8 +13,8 @@ const express = require("express")
 const cors = require("cors")
 
 // Importando rotas e controllers
-const openFinanceRoutes = require("../src/routes/openFinanceRoutes.js")
-const usuarioRoutes = require("./routes/usuarioRoutes.js")
+const openFinanceRoutes = require('../src/routes/openFinanceRoutes.js')
+const usuarioRoutes = require('./routes/usuarioRoutes.js')
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
@@ -26,6 +26,7 @@ const limitarChat = require("./middlewares/limitarChat.js")
 const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
 const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
 const postRoutes = require("./routes/postRoutes.js")
+const sessaoRoutes = require('./routes/sessaoRoutes.js')
 
 //exportanto jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
@@ -43,7 +44,7 @@ app.use(express.json({ limit: "192kb" }))
 app.use(express.urlencoded({ extended: true }))
 
 app.get('/ping', (req, res) => {
-    return res.status(200).json({ status: 'API funcionando no Render!' });
+    return res.status(200).json({ status: 'API funcionando no Render!'});
   });
 
 app.get("/health", (req, res) => res.status(200).json({ online: true, servico: "fimap-api" }))
@@ -59,6 +60,7 @@ app.use("/v1/badge", badgeRoutes)
 app.use("/v1", simulacoesRoutes)
 app.use("/v1/notificacoes", notificacaoRoutes)
 app.use("/v1/posts", postRoutes)
+app.use("/v1/sessao", sessaoRoutes)
 
 app.use((error, req, res, next) => {
     if (res.headersSent) return next(error)
