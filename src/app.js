@@ -29,7 +29,9 @@ app.use(cors(corsOption))
 app.use(express.json({ limit: "192kb" }))
 app.use(express.urlencoded({ extended: true }))
 
-
+app.get('/ping', (req, res) => {
+    return res.status(200).json({ status: 'API funcionando no Render!' });
+  });
 
 // Endpoints do Swagger para consultar e enviar mensagens de um chat
 // app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
