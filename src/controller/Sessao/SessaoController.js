@@ -1,5 +1,5 @@
 const SessaoDAO = require('../../../model/DAO/Sessao/SessaoDAO');
-const messages = require('../../config/messages');
+const messages = require('../../controller/modulo/configMensagens.js')
 
 // Criar sessão
 const criarSessao = async (req, res) => {
