@@ -8,11 +8,7 @@ const knexConfig = require('../../Database_config_knex/KnexFile.js')
 // Cria a conexão com o banco de dados utilizando as configurações do ambiente "development"
 const knexConex = knex(knexConfig.development)
 
-// Custo do bcrypt. Antes não estava definida e o UpdateUsers lançava ReferenceError ao trocar a senha.
-const SALT_ROUNDS = 10
-
-// IMPORTANTE: o hash da senha é feito SOMENTE aqui no DAO.
-// Quem chama CreateUsers/UpdateUsers deve enviar a senha em texto puro.
+const SALT_ROUNDS = 10;
 
 // Criar usuário
 const CreateUsers = async (usuario) => {
@@ -23,7 +19,7 @@ const CreateUsers = async (usuario) => {
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
     try {
-        const senhaHash = await bcrypt.hash(String(usuario.senha), 10)
+        const senhaHash = await bcrypt.hash(String(usuario.senha), SALT_ROUNDS)
 
         const result = await knexConex.raw(sql, [
             usuario.nome ?? null,

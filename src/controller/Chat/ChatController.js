@@ -1,109 +1,170 @@
+const config_message = require('../modulo/configMensagens.js')
 const chatDAO = require('../../../model/DAO/Chat/ChatDAO.js')
 
-const enviar = (res, status, dados) => res.status(status).json(dados)
-const idPositivo = (valor) => {
-    const id = Number(valor)
-    return Number.isInteger(id) && id > 0 ? id : null
-}
-const idUsuarioAutenticado = (req) =>
-    idPositivo(req.usuario?.id ?? req.usuario?.id_usuario ?? req.user?.id ?? req.user?.id_usuario)
-const erroInterno = (res, error, operacao) => {
-    console.error(`Erro ao ${operacao}:`, error)
-    return enviar(res, 500, { sucesso: false, mensagem: 'Erro interno do servidor.' })
+const NOME_MAX = 45
+
+const idValido = (id) => Number.isInteger(id) && id > 0
+
+const CriarChat = async (req, res) => {
+    try {
+        const id_usuario = Number(req.body?.id_usuario)
+        const nome = String(req.body?.nome ?? '').trim()
+
+        if (!idValido(id_usuario)) {
+            return res.status(config_message.ID_USUARIO_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.ID_USUARIO_INVALIDO.mensagem })
+        }
+
+        if (!nome) {
+            return res.status(config_message.NOME_CHAT_OBRIGATORIO.status)
+                .json({ sucesso: false, mensagem: config_message.NOME_CHAT_OBRIGATORIO.mensagem })
+        }
+
+        if (nome.length > NOME_MAX) {
+            return res.status(config_message.NOME_CHAT_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.NOME_CHAT_INVALIDO.mensagem })
+        }
+
+        const id = await chatDAO.inssertChat(nome, id_usuario)
+
+        if (!id) {
+            return res.status(config_message.ERRO_CRIAR_CHAT.status)
+                .json({ sucesso: false, mensagem: config_message.ERRO_CRIAR_CHAT.mensagem })
+        }
+
+        return res.status(config_message.CHAT_CRIADO.status)
+            .json({ sucesso: true, mensagem: config_message.CHAT_CRIADO.mensagem, id, nome })
+    } catch (error) {
+        console.error('Erro ao criar chat:', error)
+        return res.status(config_message.ERRO_CRIAR_CHAT.status)
+            .json({ sucesso: false, mensagem: config_message.ERRO_CRIAR_CHAT.mensagem })
+    }
 }
 
-const criarChat = async (req, res) => {
-    const usuarioId = idUsuarioAutenticado(req)
-    const nome = req.body?.nome == null ? null : String(req.body.nome).trim()
-    if (!usuarioId)
-        return enviar(res, 401, { sucesso: false, mensagem: 'Usuário não autenticado.' })
-    if (nome !== null && (!nome || nome.length > 45)) {
-        return enviar(res, 400, {
-            sucesso: false,
-            mensagem: 'O nome deve conter entre 1 e 45 caracteres.'
+const ListarChatsPorUsuario = async (req, res) => {
+    try {
+        const id_usuario = Number(req.params.id_usuario)
+
+        if (!idValido(id_usuario)) {
+            return res.status(config_message.ID_USUARIO_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.ID_USUARIO_INVALIDO.mensagem })
+        }
+
+        const chats = await chatDAO.ListChatsByUserId(id_usuario)
+
+        return res.status(config_message.CHATS_ENCONTRADOS.status).json({
+            sucesso: true,
+            mensagem: config_message.CHATS_ENCONTRADOS.mensagem,
+            quantidade: chats.length,
+            conteudo: chats
         })
-    }
-    try {
-        const chat = await chatDAO.criarChat(usuarioId, nome)
-        return enviar(res, 201, chat)
     } catch (error) {
-        return erroInterno(res, error, 'criar chat')
+        console.error('Erro ao listar chats:', error)
+        return res.status(config_message.ERRO_BUSCAR_CHATS.status)
+            .json({ sucesso: false, mensagem: config_message.ERRO_BUSCAR_CHATS.mensagem })
     }
 }
 
-const listarChats = async (req, res) => {
-    const usuarioId = idUsuarioAutenticado(req)
-    const pagina = req.query.pagina === undefined ? 1 : Number(req.query.pagina)
-    const tamanho = req.query.tamanho_pagina === undefined ? 20 : Number(req.query.tamanho_pagina)
-    if (!usuarioId)
-        return enviar(res, 401, { sucesso: false, mensagem: 'Usuário não autenticado.' })
-    if (
-        !Number.isInteger(pagina) ||
-        pagina < 1 ||
-        !Number.isInteger(tamanho) ||
-        tamanho < 1 ||
-        tamanho > 100
-    ) {
-        return enviar(res, 400, { sucesso: false, mensagem: 'Parâmetros de paginação inválidos.' })
-    }
+const ListaPorId = async (req, res) => {
     try {
-        return enviar(res, 200, await chatDAO.listarChats(usuarioId, { pagina, tamanho }))
+        const id_chat = Number(req.params.id_chat)
+
+        if (!idValido(id_chat)) {
+            return res.status(config_message.ID_CHAT_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.ID_CHAT_INVALIDO.mensagem })
+        }
+
+        const chat = await chatDAO.GetChatById(id_chat)
+
+        if (!chat) {
+            return res.status(config_message.CHAT_NAO_ENCONTRADO.status)
+                .json({ sucesso: false, mensagem: config_message.CHAT_NAO_ENCONTRADO.mensagem })
+        }
+
+        return res.status(config_message.CHAT_ENCONTRADO.status)
+            .json({ sucesso: true, mensagem: config_message.CHAT_ENCONTRADO.mensagem, conteudo: chat })
     } catch (error) {
-        return erroInterno(res, error, 'listar chats')
+        console.error('Erro ao buscar chat por ID:', error)
+        return res.status(config_message.ERRO_BUSCAR_CHAT.status)
+            .json({ sucesso: false, mensagem: config_message.ERRO_BUSCAR_CHAT.mensagem })
     }
 }
 
-const consultarChat = async (req, res) => {
-    const chatId = idPositivo(req.params.chatId)
-    const usuarioId = idUsuarioAutenticado(req)
-    if (!chatId) return enviar(res, 400, { sucesso: false, mensagem: 'ID do chat inválido.' })
-    if (!usuarioId)
-        return enviar(res, 401, { sucesso: false, mensagem: 'Usuário não autenticado.' })
+const AtualizarNomeChat = async (req, res) => {
     try {
-        const chat = await chatDAO.consultarChat(chatId, usuarioId)
-        return chat
-            ? enviar(res, 200, chat)
-            : enviar(res, 404, { sucesso: false, mensagem: 'Chat não encontrado.' })
+        const id_chat = Number(req.params.id_chat)
+        const nome = String(req.body?.nome ?? '').trim()
+
+        if (!idValido(id_chat)) {
+            return res.status(config_message.ID_CHAT_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.ID_CHAT_INVALIDO.mensagem })
+        }
+
+        if (!nome) {
+            return res.status(config_message.NOME_CHAT_OBRIGATORIO.status)
+                .json({ sucesso: false, mensagem: config_message.NOME_CHAT_OBRIGATORIO.mensagem })
+        }
+
+        if (nome.length > NOME_MAX) {
+            return res.status(config_message.NOME_CHAT_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.NOME_CHAT_INVALIDO.mensagem })
+        }
+
+        const chat = await chatDAO.GetChatById(id_chat)
+
+        if (!chat) {
+            return res.status(config_message.CHAT_NAO_ENCONTRADO.status)
+                .json({ sucesso: false, mensagem: config_message.CHAT_NAO_ENCONTRADO.mensagem })
+        }
+
+        await chatDAO.UpdateChatName(id_chat, nome)
+
+        return res.status(config_message.CHAT_ATUALIZADO.status)
+            .json({ sucesso: true, mensagem: config_message.CHAT_ATUALIZADO.mensagem })
     } catch (error) {
-        return erroInterno(res, error, 'consultar chat')
+        console.error('Erro ao atualizar nome do chat:', error)
+        return res.status(config_message.ERRO_ATUALIZAR_CHAT.status)
+            .json({ sucesso: false, mensagem: config_message.ERRO_ATUALIZAR_CHAT.mensagem })
     }
 }
 
-const renomearChat = async (req, res) => {
-    const chatId = idPositivo(req.params.chatId)
-    const usuarioId = idUsuarioAutenticado(req)
-    const nome = typeof req.body?.nome === 'string' ? req.body.nome.trim() : ''
-    if (!chatId || !nome || nome.length > 45)
-        return enviar(res, 400, {
-            sucesso: false,
-            mensagem: 'Informe um nome válido, com até 45 caracteres.'
-        })
-    if (!usuarioId)
-        return enviar(res, 401, { sucesso: false, mensagem: 'Usuário não autenticado.' })
+const ApagarChat = async (req, res) => {
     try {
-        const chat = await chatDAO.renomearChat(chatId, usuarioId, nome)
-        return chat
-            ? enviar(res, 200, chat)
-            : enviar(res, 404, { sucesso: false, mensagem: 'Chat não encontrado.' })
+        const id_chat = Number(req.params.id_chat)
+        const id_usuario = Number(req.query?.id_usuario)
+
+        if (!idValido(id_chat)) {
+            return res.status(config_message.ID_CHAT_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.ID_CHAT_INVALIDO.mensagem })
+        }
+
+        if (!idValido(id_usuario)) {
+            return res.status(config_message.ID_USUARIO_INVALIDO.status)
+                .json({ sucesso: false, mensagem: config_message.ID_USUARIO_INVALIDO.mensagem })
+        }
+
+        const chat = await chatDAO.GetChatById(id_chat)
+
+        if (!chat || chat.id_usuario !== id_usuario) {
+            return res.status(config_message.CHAT_NAO_ENCONTRADO.status)
+                .json({ sucesso: false, mensagem: config_message.CHAT_NAO_ENCONTRADO.mensagem })
+        }
+
+        await chatDAO.apagarChat(chat.id)
+
+        return res.status(config_message.CHAT_DELETADO.status)
+            .json({ sucesso: true, mensagem: config_message.CHAT_DELETADO.mensagem })
     } catch (error) {
-        return erroInterno(res, error, 'renomear chat')
+        console.error('Erro ao apagar chat:', error)
+        return res.status(config_message.ERRO_DELETAR_CHAT.status)
+            .json({ sucesso: false, mensagem: config_message.ERRO_DELETAR_CHAT.mensagem })
     }
 }
 
-const deletarChat = async (req, res) => {
-    const chatId = idPositivo(req.params.chatId)
-    const usuarioId = idUsuarioAutenticado(req)
-    if (!chatId) return enviar(res, 400, { sucesso: false, mensagem: 'ID do chat inválido.' })
-    if (!usuarioId)
-        return enviar(res, 401, { sucesso: false, mensagem: 'Usuário não autenticado.' })
-    try {
-        const deletado = await chatDAO.deletarChat(chatId, usuarioId)
-        return deletado
-            ? res.status(204).send()
-            : enviar(res, 404, { sucesso: false, mensagem: 'Chat não encontrado.' })
-    } catch (error) {
-        return erroInterno(res, error, 'excluir chat')
-    }
+module.exports = {
+    CriarChat,
+    ListarChatsPorUsuario,
+    ListaPorId,
+    AtualizarNomeChat,
+    ApagarChat
 }
-
-module.exports = { criarChat, listarChats, consultarChat, renomearChat, deletarChat }
