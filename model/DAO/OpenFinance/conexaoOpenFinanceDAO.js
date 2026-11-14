@@ -12,7 +12,7 @@ const criarConexao = async (conexao) => {
     console.log(conexao)
     const sql = `INSERT INTO tbl_conexao_open_finance
         (status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, nome_instituicao, id_usuario)
-        VALUES (?, ?, ?, ?, ?, ?)`
+        VALUES (?, ?, ?, ?, ?, ?, ?)`
 
     try {
         const result = await knexConex.raw(sql, [
@@ -41,6 +41,7 @@ const listarConexoesPorUsuario = async (idUsuario) => {
         ultima_sincronizacao,
         provedor,
         external_connection_id,
+        nome_instituicao,
         id_usuario
     FROM tbl_conexao_open_finance
     WHERE id_usuario = ?`
@@ -63,6 +64,7 @@ const buscarConexaoPorId = async (id) => {
         ultima_sincronizacao,
         provedor,
         external_connection_id,
+        nome_instituicao,
         id_usuario
     FROM tbl_conexao_open_finance
     WHERE id = ?`

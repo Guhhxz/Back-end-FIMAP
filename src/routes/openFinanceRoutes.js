@@ -2,6 +2,7 @@ const express = require("express")
 const router = express.Router()
 
 const openFinanceController = require("../controller/OpenFinance/openFinanceController.js")
+const contasRendimentoController = require("../controller/OpenFinance/ContasRendimentoController.js")
 const extratoCartaoController = require("../controller/OpenFinance/extratoCartaoController.js")
 
 router.post("/connect-token", openFinanceController.gerarConnectToken)
@@ -9,6 +10,7 @@ router.post("/connect-token", openFinanceController.gerarConnectToken)
 // -------------------- CONEXÕES -------------------- 
 router.post("/conexoes/:idUsuario", openFinanceController.adicionarConexao)
 router.get("/conexoes/:idUsuario", openFinanceController.listarConexoes)
+router.get("/contas-rendimento", contasRendimentoController.listarContasRendimento)
 
 // -------------------- OBTER DADOS -------------------- 
 router.get("/financeiro/contas/:itemId", openFinanceController.obterContas)
