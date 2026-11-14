@@ -312,7 +312,6 @@ async function listarConexoes(req, res) {
 const deletarConexao = async (req, res) => {
     try {
         const { id_usuario, id } = req.params
-        console.log(id_usuario, id)
 
         const resultado = await conexaoDAO.DeleteConexao({
             id,
