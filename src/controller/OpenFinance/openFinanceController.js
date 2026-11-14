@@ -309,6 +309,39 @@ async function listarConexoes(req, res) {
     }
 }
 
+const deletarConexao = async (req, res) => {
+    try {
+        const { id_usuario, id } = req.params
+        console.log(id_usuario, id)
+
+        const resultado = await conexaoDAO.DeleteConexao({
+            id,
+            id_usuario
+        })
+
+        if (!resultado) {
+            return res.status(404).json({
+                sucesso: false,
+                codigo: 'CONEXÃO_NÃO_ENCONTRADA',
+                mensagem: 'Conexão Não Encontrada.'
+            })
+        }
+
+        return res.status(200).json({
+            sucesso: true,
+            mensagem: 'Conexão deletada com sucesso!'
+        })
+
+    } catch (error) {
+        console.error('Erro ao deletar conexão:', error)
+        return res.status(500).json({
+            sucesso: false,
+            codigo: 'ERRO_INTERNO',
+            mensagem: 'Erro interno ao deletar conexão.'
+        })
+    }
+}
+
 function lerParametrosCartao(req) {
     return {
         itemId: req.query.itemId,
@@ -432,6 +465,7 @@ module.exports = {
     obterEvolucaoInvestimentos,
     obterEmprestimoPorId,
     obterParcelasEmprestimo,
-    obterDetalheEmprestimo
+    obterDetalheEmprestimo,
+    deletarConexao
 }
 

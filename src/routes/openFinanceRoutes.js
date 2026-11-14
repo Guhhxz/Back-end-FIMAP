@@ -11,6 +11,7 @@ router.post("/connect-token", openFinanceController.gerarConnectToken)
 router.post("/conexoes/:idUsuario", openFinanceController.adicionarConexao)
 router.get("/conexoes/:idUsuario", openFinanceController.listarConexoes)
 router.get("/contas-rendimento", contasRendimentoController.listarContasRendimento)
+router.delete("/conexoes/:id_usuario/:id", openFinanceController.deletarConexao)
 
 // -------------------- OBTER DADOS -------------------- 
 router.get("/financeiro/contas/:itemId", openFinanceController.obterContas)

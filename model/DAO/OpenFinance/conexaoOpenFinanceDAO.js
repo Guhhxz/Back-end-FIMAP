@@ -109,10 +109,33 @@ const atualizarPercentualCdiManual = async (id, idUsuario, percentualCdiManual) 
     }
 }
 
+// Deletar meta
+const DeleteConexao = async (conexao) => {
+    const sql = `
+        DELETE FROM tbl_conexao_open_finance
+        WHERE id = ?
+        AND id_usuario = ?
+    `
+
+    try {
+        const [result] = await knexConex.raw(sql, [
+            conexao.id,
+            conexao.id_usuario
+        ])
+
+        return result.affectedRows > 0
+
+    } catch (error) {
+        console.error('Erro ao deletar conexão:', error)
+        return false
+    }
+}
+
 module.exports = {
     criarConexao,
     listarConexoesPorUsuario,
     buscarConexaoPorId,
     listarTodasConexoesAtivas,
-    atualizarPercentualCdiManual
+    atualizarPercentualCdiManual,
+    DeleteConexao
 }
