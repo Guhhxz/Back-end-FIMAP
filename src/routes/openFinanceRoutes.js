@@ -27,5 +27,8 @@ router.get("/financeiro/cartoes/:cartaoId/extrato", extratoCartaoController.obte
 router.get("/financeiro/investimentos/:itemId/evolucao", openFinanceController.obterEvolucaoInvestimentos)
 router.get("/financeiro/emprestimos/:itemId/:emprestimoId/detalhe", openFinanceController.obterDetalheEmprestimo)
 
+//CDI PUT
+router.put('/contas-rendimento/:id', contasRendimentoController.atualizarCdiManual)
+
 
 module.exports = router

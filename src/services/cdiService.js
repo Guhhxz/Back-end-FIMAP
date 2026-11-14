@@ -63,9 +63,7 @@ async function obterCdiAtual() {
 
     if (valor === null) {
         console.warn(
-            'Não consegui achar o valor do CDI na resposta do Meelion MCP (get_financial_indicators). ' +
-            'Rode o curl de exemplo do README e confira o campo certo — resposta recebida:',
-            JSON.stringify(dados)
+            'Não consegui achar o valor do CDI na resposta do Meelion MCP (get_financial_indicators). '
         )
         return null
     }
@@ -121,8 +119,9 @@ async function buscarNaApiExterna(nomeInstituicao) {
 }
 
 // ⚠️ Tabela de fallback — só entra em cena quando o Meelion não tem título CDI do banco
-// (ex.: "Pluggy Bank", que é instituição de sandbox) ou se o MCP estiver fora do ar.
-// Valores aproximados, não vieram de nenhuma fonte real.
+// ou se o MCP estiver fora do ar. Valores aproximados, não vieram de nenhuma fonte real.
+// De propósito, bancos fictícios/sandbox (ex.: "Pluggy Bank") NÃO entram aqui: pra esses,
+// o `percentualCdi` deve vir null mesmo, e o usuário informa manualmente pelo front.
 const TABELA_LOCAL = {
     'nubank': 1.00,
     'inter': 1.00,
@@ -131,7 +130,6 @@ const TABELA_LOCAL = {
     'will': 0.99,
     'next': 0.95,
     'original': 0.98,
-    'pluggy': 1.00, // instituição de sandbox/teste do Pluggy
 }
 
 function normalizar(texto) {
