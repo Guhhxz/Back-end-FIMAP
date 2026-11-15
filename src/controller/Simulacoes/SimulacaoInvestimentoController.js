@@ -44,10 +44,9 @@ const validarDados = (body, parcial = false) => {
 }
 
 const executar = (operacao) => async (req, res) => {
-    const usuarioId = idPositivo(
-        req.usuario?.id ?? req.usuario?.id_usuario ?? req.user?.id ?? req.user?.id_usuario
-    )
-    if (!usuarioId) return erro(res, 401, 'Usuário não autenticado.')
+    // Sem JWT por enquanto: o front envia o dono da simulação em ?id_usuario=
+    const usuarioId = idPositivo(req.query?.id_usuario)
+    if (!usuarioId) return erro(res, 422, 'id_usuario inválido.')
 
     try {
         return await operacao(req, res, usuarioId)
