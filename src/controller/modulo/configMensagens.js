@@ -199,7 +199,7 @@ const config_message = {
     },
     SENHA_INVALIDA: {
         status: 422,
-        mensagem: 'A senha não atende aos critérios exigidos.'
+        mensagem: 'A senha não atende aos critérios exigidos ou usuário não encontrado.'
     },
     SENHA_ATUAL_INCORRETA: {
         status: 401,

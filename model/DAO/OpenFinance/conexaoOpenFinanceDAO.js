@@ -10,8 +10,8 @@ const knexConex = knex(knexConfig.development)
 // Criar conexão Open Finance
 const criarConexao = async (conexao) => {
     const sql = `INSERT INTO tbl_conexao_open_finance
-        (status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, id_usuario)
-        VALUES (?, ?, ?, ?, ?, ?)`
+        (status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, nome_instituicao, id_usuario)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`
 
     try {
         const result = await knexConex.raw(sql, [
@@ -20,6 +20,7 @@ const criarConexao = async (conexao) => {
             conexao.ultima_sincronizacao ?? null,
             conexao.provedor ?? null,
             conexao.external_connection_id ?? null,
+            conexao.nome_instituicao ?? null,
             conexao.id_usuario
         ])
 
@@ -39,6 +40,8 @@ const listarConexoesPorUsuario = async (idUsuario) => {
         ultima_sincronizacao,
         provedor,
         external_connection_id,
+        nome_instituicao,
+        percentual_cdi_manual,
         id_usuario
     FROM tbl_conexao_open_finance
     WHERE id_usuario = ?`
@@ -61,6 +64,8 @@ const buscarConexaoPorId = async (id) => {
         ultima_sincronizacao,
         provedor,
         external_connection_id,
+        nome_instituicao,
+        percentual_cdi_manual,
         id_usuario
     FROM tbl_conexao_open_finance
     WHERE id = ?`
@@ -87,9 +92,50 @@ const listarTodasConexoesAtivas = async () => {
     }
 }
 
+// Define/edita o % do CDI informado manualmente pelo usuário pra essa conexão
+// (usado quando o app não consegue identificar o CDI automaticamente).
+const atualizarPercentualCdiManual = async (id, idUsuario, percentualCdiManual) => {
+    const sql = `UPDATE tbl_conexao_open_finance
+        SET percentual_cdi_manual = ?
+        WHERE id = ?
+        AND id_usuario = ?`
+
+    try {
+        const [result] = await knexConex.raw(sql, [percentualCdiManual, id, idUsuario])
+        return result.affectedRows > 0
+    } catch (error) {
+        console.error('Erro ao atualizar percentual de CDI manual:', error)
+        return false
+    }
+}
+
+// Deletar meta
+const DeleteConexao = async (conexao) => {
+    const sql = `
+        DELETE FROM tbl_conexao_open_finance
+        WHERE id = ?
+        AND id_usuario = ?
+    `
+
+    try {
+        const [result] = await knexConex.raw(sql, [
+            conexao.id,
+            conexao.id_usuario
+        ])
+
+        return result.affectedRows > 0
+
+    } catch (error) {
+        console.error('Erro ao deletar conexão:', error)
+        return false
+    }
+}
+
 module.exports = {
     criarConexao,
     listarConexoesPorUsuario,
     buscarConexaoPorId,
-    listarTodasConexoesAtivas
+    listarTodasConexoesAtivas,
+    atualizarPercentualCdiManual,
+    DeleteConexao
 }

@@ -48,7 +48,7 @@ app.use("/v1/seguindo", seguir_seguidoresRoutes)
 app.use("/v1/configuracoes", configuracoesRoutes)
 app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
-app.use("/v1/simulacoes", simulacoesRoutes)
+app.use("/v1", simulacoesRoutes)
 app.use("/v1/notificacoes", notificacaoRoutes)
 
 const PORT = process.env.PORT || 8080

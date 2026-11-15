@@ -253,7 +253,7 @@ async function obterResumosBancario(req, res) {
 async function adicionarConexao(req, res) {
     try {
         const { idUsuario } = req.params
-        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id } = req.body
+        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, nome_instituicao } = req.body
 
         if (!idUsuario) {
             return res.status(400).json({ erro: "Informe o ID do usuário." })
@@ -269,6 +269,7 @@ async function adicionarConexao(req, res) {
             ultima_sincronizacao,
             provedor,
             external_connection_id,
+            nome_instituicao,
             id_usuario: idUsuario
         }
 
@@ -305,6 +306,38 @@ async function listarConexoes(req, res) {
     } catch (error) {
         console.error("Erro ao listar conexões:", error)
         return res.status(500).json({ erro: "Não foi possível listar as conexões." })
+    }
+}
+
+const deletarConexao = async (req, res) => {
+    try {
+        const { id_usuario, id } = req.params
+
+        const resultado = await conexaoDAO.DeleteConexao({
+            id,
+            id_usuario
+        })
+
+        if (!resultado) {
+            return res.status(404).json({
+                sucesso: false,
+                codigo: 'CONEXÃO_NÃO_ENCONTRADA',
+                mensagem: 'Conexão Não Encontrada.'
+            })
+        }
+
+        return res.status(200).json({
+            sucesso: true,
+            mensagem: 'Conexão deletada com sucesso!'
+        })
+
+    } catch (error) {
+        console.error('Erro ao deletar conexão:', error)
+        return res.status(500).json({
+            sucesso: false,
+            codigo: 'ERRO_INTERNO',
+            mensagem: 'Erro interno ao deletar conexão.'
+        })
     }
 }
 
@@ -431,6 +464,7 @@ module.exports = {
     obterEvolucaoInvestimentos,
     obterEmprestimoPorId,
     obterParcelasEmprestimo,
-    obterDetalheEmprestimo
+    obterDetalheEmprestimo,
+    deletarConexao
 }
 
