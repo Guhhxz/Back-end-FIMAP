@@ -6,15 +6,17 @@ const knexConex = knex(knexConfig.development)
 
 const CreateNotificacao = async (notificacao) => {
     const sql = `insert into tbl_notificacao
-        (icone, nome, conteudo, data_criacao, lida, id_usuario)
-        values (?, ?, ?, now(), 0, ?)`
+        (icone, nome, conteudo, data_criacao, lida, id_usuario, tipo_referencia, id_referencia)
+        values (?, ?, ?, now(), 0, ?, ?, ?)`
 
     try {
         const [result] = await knexConex.raw(sql, [
             notificacao.icone,
             notificacao.nome,
             notificacao.conteudo,
-            notificacao.id_usuario
+            notificacao.id_usuario,
+            notificacao.tipo_referencia ?? null,
+            notificacao.id_referencia ?? null
         ])
 
         return result.insertId
@@ -27,7 +29,7 @@ const CreateNotificacao = async (notificacao) => {
 }
 
 const GetNotificacaoById = async (id) => {
-    const sql = `select id, icone, nome, conteudo, data_criacao, lida, id_usuario
+    const sql = `select id, icone, nome, conteudo, data_criacao, lida, id_usuario, tipo_referencia, id_referencia
         from tbl_notificacao
         where id = ?`
 
@@ -42,7 +44,7 @@ const GetNotificacaoById = async (id) => {
 }
 
 const GetNotificacoesByUsuario = async (id_usuario, { lida } = {}) => {
-    let sql = `select id, icone, nome, conteudo, data_criacao, lida
+    let sql = `select id, icone, nome, conteudo, data_criacao, lida, tipo_referencia, id_referencia
         from tbl_notificacao
         where id_usuario = ?`
     const valores = [id_usuario]
@@ -64,57 +66,36 @@ const GetNotificacoesByUsuario = async (id_usuario, { lida } = {}) => {
     }
 }
 
-const ListAllNotificacoesLidas = async (id_usuario) => {
-    const sql = `select
-                     icone,
-                     nome,
-                     conteudo,
-                     data_criacao,
-                     lida,
-                     id_usuario,
-                     (
-                     select count(*)
-                     from tbl_notificacao 
-                     where id_usuario = ? and lida = 1)
-                     as total_lidas
-    from tbl_notificacao
-    where lida = 1 and id_usuario = ?
-    order by data_criacao desc;`
+// Conta quantas notificações não lidas o usuário tem. Usada pelo badge do
+// sino no header — por isso retorna sempre um número (nunca uma lista).
+const ContarNaoLidas = async (id_usuario) => {
+    const sql = `select count(*) as total
+        from tbl_notificacao
+        where id_usuario = ? and lida = 0`
 
     try {
         const [result] = await knexConex.raw(sql, [id_usuario])
 
-        return result || []
+        return Number(result[0].total)
     } catch (error) {
-        console.error('Erro ao buscar notificações lidas:', error)
-        return false
+        console.error('Erro ao contar notificações não lidas:', error)
+        return null
     }
 }
 
-const ListAllNotificacoesNaoLidas = async (id_usuario) => {
-    const sql = `select
-                     icone,
-                     nome,
-                     conteudo,
-                     data_criacao,
-                     lida,
-                     id_usuario,
-                     (
-                     select count(*)
-                     from tbl_notificacao 
-                     where id_usuario = ? and lida = 0)
-                     as total_nao_lidas
-    from tbl_notificacao
-    where lida = 0 and id_usuario = ?
-    order by data_criacao desc;`
+// Mesma ideia de ContarNaoLidas, mas para notificações já lidas.
+const ContarLidas = async (id_usuario) => {
+    const sql = `select count(*) as total
+        from tbl_notificacao
+        where id_usuario = ? and lida = 1`
 
     try {
         const [result] = await knexConex.raw(sql, [id_usuario])
 
-        return result || []
+        return Number(result[0].total)
     } catch (error) {
-        console.error('Erro ao buscar notificações lidas:', error)
-        return false
+        console.error('Erro ao contar notificações lidas:', error)
+        return null
     }
 }
 
@@ -170,6 +151,6 @@ module.exports = {
     MarcarComoLida,
     MarcarTodasComoLidas,
     DeleteNotificacao,
-    ListAllNotificacoesLidas,
-    ListAllNotificacoesNaoLidas
+    ContarNaoLidas,
+    ContarLidas
 }
