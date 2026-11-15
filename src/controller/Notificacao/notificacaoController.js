@@ -1,14 +1,41 @@
-
 const config_message = require('../../controller/modulo/configMensagens.js')
 const NotificacaoModel = require('../../../model/DAO/notificacoes/notificacaoDAO.js')
 
 const idValido = (v) => Number.isInteger(v) && v > 0
 
+const TIPOS_REFERENCIA_VALIDOS = ['post', 'comentario', 'meta', 'oportunidade']
+
 const respostaErro = (res, configuracao) => {
     return res.status(configuracao.status).json({
         sucesso: false,
+        codigo: configuracao.codigo,
         mensagem: configuracao.mensagem
     })
+}
+
+// Valida o par opcional (tipo_referencia, id_referencia) que liga a notificação
+// a uma entidade (post, meta, oportunidade...). Os dois são opcionais, mas se um
+// vier o outro também precisa vir, e de forma válida.
+const referenciaValida = (tipo_referencia, id_referencia) => {
+    if (tipo_referencia === undefined && id_referencia === undefined) {
+        return { ok: true, tipo_referencia: null, id_referencia: null }
+    }
+
+    if (tipo_referencia === undefined || id_referencia === undefined) {
+        return { ok: false }
+    }
+
+    if (!TIPOS_REFERENCIA_VALIDOS.includes(tipo_referencia)) {
+        return { ok: false }
+    }
+
+    const id = Number(id_referencia)
+
+    if (!idValido(id)) {
+        return { ok: false }
+    }
+
+    return { ok: true, tipo_referencia, id_referencia: id }
 }
 
 const criarNotificacao = async (req, res) => {
@@ -20,9 +47,15 @@ const criarNotificacao = async (req, res) => {
             return respostaErro(res, config_message.ID_INVALIDO)
         }
 
-        const { icone, nome, conteudo } = body
+        const { icone, nome, conteudo, tipo_referencia, id_referencia } = body
 
         if ([icone, nome, conteudo].some(v => typeof v !== 'string' || !v.trim())) {
+            return respostaErro(res, config_message.PARAMETRO_INVALIDO)
+        }
+
+        const referencia = referenciaValida(tipo_referencia, id_referencia)
+
+        if (!referencia.ok) {
             return respostaErro(res, config_message.PARAMETRO_INVALIDO)
         }
 
@@ -30,7 +63,9 @@ const criarNotificacao = async (req, res) => {
             icone: icone.trim(),
             nome: nome.trim(),
             conteudo: conteudo.trim(),
-            id_usuario
+            id_usuario,
+            tipo_referencia: referencia.tipo_referencia,
+            id_referencia: referencia.id_referencia
         })
 
         if (id_notificacao === 'FK_INVALIDA') {
@@ -230,9 +265,9 @@ const buscarTodasNaolidas = async (req, res) => {
             return respostaErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const quantidade = await NotificacaoModel.ListAllNotificacoesNaoLidas(id_usuario)
+        const quantidade = await NotificacaoModel.ContarNaoLidas(id_usuario)
 
-        if (quantidade === false) {
+        if (quantidade === null) {
             return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
         }
 
@@ -258,13 +293,13 @@ const buscarTodaslidas = async (req, res) => {
             return respostaErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const quantidade = await NotificacaoModel.ListAllNotificacoesLidas(id_usuario)
+        const quantidade = await NotificacaoModel.ContarLidas(id_usuario)
 
-        if (quantidade === false) {
+        if (quantidade === null) {
             return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
         }
 
-        const mensagem = config_message.NOTIFICACOES_NAO_LIDAS
+        const mensagem = config_message.NOTIFICACOES_LIDAS_CONTAGEM
 
         return res.status(mensagem.status).json({
             sucesso: true,
@@ -273,7 +308,7 @@ const buscarTodaslidas = async (req, res) => {
         })
 
     } catch (error) {
-        console.error('Erro ao buscar notificações não lidas:', error)
+        console.error('Erro ao buscar notificações lidas:', error)
         return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
     }
 }
