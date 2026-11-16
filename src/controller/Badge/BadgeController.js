@@ -1,19 +1,33 @@
 const config_message = require('../modulo/configMensagens.js')
 const BadgeModel = require('../../../model/DAO/Badge/badgeDAO.js')
 
-const cfg = (chave) => config_message[chave] || config_message.ERRO_INTERNO
-
-const idValido = (v) => Number.isInteger(v) && v > 0
+/* ----------------------------- Constantes ----------------------------- */
 
 const CAMPOS_PERMITIDOS = ['icone', 'nome', 'descricao', 'xp']
+const CAMPOS_TEXTO = ['icone', 'nome', 'descricao']
 const TAMANHO_MAX_NOME = 45
 
-const respostaErro = (res, configuracao) => {
-    return res.status(configuracao.status).json({
+/* ------------------------------ Helpers ------------------------------ */
+
+// Busca a configuração de mensagem; cai em ERRO_INTERNO se a chave não existir
+const cfg = (chave) => config_message[chave] || config_message.ERRO_INTERNO
+
+const idValido = (valor) => Number.isInteger(valor) && valor > 0
+
+const respostaErro = (res, configuracao) =>
+    res.status(configuracao.status).json({
         sucesso: false,
         mensagem: configuracao.mensagem
     })
-}
+
+const respostaSucesso = (res, configuracao, extra = {}) =>
+    res.status(configuracao.status).json({
+        sucesso: true,
+        mensagem: configuracao.mensagem,
+        ...extra
+    })
+
+const textoVazio = (valor) => typeof valor !== 'string' || !valor.trim()
 
 const xpInvalido = (xp) => {
     if (typeof xp !== 'number' && typeof xp !== 'string') return true
@@ -24,42 +38,34 @@ const xpInvalido = (xp) => {
     return !Number.isInteger(n) || n < 0
 }
 
-// Validação dos campos da badge
+// Valida os campos da badge. Retorna a config de erro ou null se estiver tudo certo.
+// parcial = true: valida só os campos que vieram (usado na atualização)
 const validarCampos = (badge, parcial = false) => {
     const verificar = (campo) => !parcial || badge[campo] !== undefined
 
     if (verificar('nome')) {
-        if (typeof badge.nome !== 'string' || !badge.nome.trim()) {
-            return cfg('NOME_BADGE_OBRIGATORIO')
-        }
-
-        if (badge.nome.trim().length > TAMANHO_MAX_NOME) {
-            return cfg('NOME_BADGE_INVALIDO')
-        }
+        if (textoVazio(badge.nome)) return cfg('NOME_BADGE_OBRIGATORIO')
+        if (badge.nome.trim().length > TAMANHO_MAX_NOME) return cfg('NOME_BADGE_INVALIDO')
     }
 
-    if (verificar('descricao')) {
-        if (typeof badge.descricao !== 'string' || !badge.descricao.trim()) {
-            return cfg('DESCRICAO_BADGE_OBRIGATORIA')
-        }
+    if (verificar('descricao') && textoVazio(badge.descricao)) {
+        return cfg('DESCRICAO_BADGE_OBRIGATORIA')
     }
 
-    if (verificar('icone')) {
-        if (typeof badge.icone !== 'string' || !badge.icone.trim()) {
-            return cfg('ICONE_BADGE_OBRIGATORIO')
-        }
+    if (verificar('icone') && textoVazio(badge.icone)) {
+        return cfg('ICONE_BADGE_OBRIGATORIO')
     }
 
-    if (verificar('xp')) {
-        if (xpInvalido(badge.xp)) {
-            return cfg('XP_BADGE_INVALIDO')
-        }
+    if (verificar('xp') && xpInvalido(badge.xp)) {
+        return cfg('XP_BADGE_INVALIDO')
     }
 
     return null
 }
 
-// Criar badge
+/* ----------------------------- Controllers ----------------------------- */
+
+// POST - Criar badge
 const criarBadge = async (req, res) => {
     try {
         const body = req.body || {}
@@ -98,13 +104,7 @@ const criarBadge = async (req, res) => {
             return respostaErro(res, cfg('ERRO_CRIAR_BADGE'))
         }
 
-        const mensagem = cfg('BADGE_CRIADO')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem,
-            id_badge
-        })
+        return respostaSucesso(res, cfg('BADGE_CRIADO'), { id_badge })
 
     } catch (error) {
         console.error('Erro ao criar badge:', error)
@@ -112,7 +112,7 @@ const criarBadge = async (req, res) => {
     }
 }
 
-// Atualizar badge (parcial)
+// PUT - Atualizar badge (parcial)
 const atualizarBadge = async (req, res) => {
     try {
         const id_badge = Number(req.params.id_badge)
@@ -140,9 +140,11 @@ const atualizarBadge = async (req, res) => {
             return respostaErro(res, erroValidacao)
         }
 
-        if (campos.nome !== undefined) campos.nome = campos.nome.trim()
-        if (campos.icone !== undefined) campos.icone = campos.icone.trim()
-        if (campos.descricao !== undefined) campos.descricao = campos.descricao.trim()
+        // Normaliza os valores já validados
+        for (const campo of CAMPOS_TEXTO) {
+            if (campos[campo] !== undefined) campos[campo] = campos[campo].trim()
+        }
+
         if (campos.xp !== undefined) campos.xp = Number(campos.xp)
 
         // Verifica se o nome já pertence a outra badge
@@ -158,10 +160,7 @@ const atualizarBadge = async (req, res) => {
             }
         }
 
-        const resultado = await BadgeModel.UpdateBadge({
-            ...campos,
-            id: id_badge
-        })
+        const resultado = await BadgeModel.UpdateBadge({ ...campos, id: id_badge })
 
         if (resultado === 'DUPLICADO') {
             return respostaErro(res, cfg('BADGE_EXISTENTE'))
@@ -175,12 +174,7 @@ const atualizarBadge = async (req, res) => {
             return respostaErro(res, cfg('BADGE_NAO_ENCONTRADO'))
         }
 
-        const mensagem = cfg('BADGE_ATUALIZADO')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem
-        })
+        return respostaSucesso(res, cfg('BADGE_ATUALIZADO'))
 
     } catch (error) {
         console.error('Erro ao atualizar badge:', error)
@@ -188,7 +182,7 @@ const atualizarBadge = async (req, res) => {
     }
 }
 
-// Deletar badge
+// DELETE - Deletar badge
 const deletarBadge = async (req, res) => {
     try {
         const id_badge = Number(req.params.id_badge)
@@ -211,12 +205,7 @@ const deletarBadge = async (req, res) => {
             return respostaErro(res, cfg('BADGE_NAO_ENCONTRADO'))
         }
 
-        const mensagem = cfg('BADGE_DELETADO')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem
-        })
+        return respostaSucesso(res, cfg('BADGE_DELETADO'))
 
     } catch (error) {
         console.error('Erro ao deletar badge:', error)
@@ -224,7 +213,7 @@ const deletarBadge = async (req, res) => {
     }
 }
 
-// Buscar badge pelo nome
+// GET - Buscar badge pelo nome
 const buscarBadgePorNome = async (req, res) => {
     try {
         const { nome } = req.params
@@ -239,13 +228,7 @@ const buscarBadgePorNome = async (req, res) => {
             return respostaErro(res, cfg('BADGE_NAO_ENCONTRADO'))
         }
 
-        const mensagem = cfg('BADGE_ENCONTRADO')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem,
-            badge
-        })
+        return respostaSucesso(res, cfg('BADGE_ENCONTRADO'), { badge })
 
     } catch (error) {
         console.error('Erro ao buscar badge:', error)
@@ -253,7 +236,7 @@ const buscarBadgePorNome = async (req, res) => {
     }
 }
 
-// Buscar todas as badges
+// GET - Buscar todas as badges
 const buscarTodasBadges = async (req, res) => {
     try {
         const badges = await BadgeModel.GetAllBadges()
@@ -262,14 +245,11 @@ const buscarTodasBadges = async (req, res) => {
             return respostaErro(res, cfg('ERRO_BUSCAR_BADGES'))
         }
 
-        const mensagem = cfg('BADGES_ENCONTRADOS')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem,
-            quantidade: badges.length,
-            badges
-        })
+        return respostaSucesso(
+            res,
+            cfg('BADGES_ENCONTRADOS'),
+            { quantidade: badges.length, badges }
+        )
 
     } catch (error) {
         console.error('Erro ao buscar badges:', error)

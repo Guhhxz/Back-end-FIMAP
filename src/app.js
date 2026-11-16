@@ -59,7 +59,7 @@ app.use("/v1/openfinance/metas", metasRoutes)
 app.use("/v1/badge", badgeRoutes)
 app.use("/v1", simulacoesRoutes)
 app.use("/v1/notificacoes", notificacaoRoutes)
-app.use("/v1/posts", postRoutes)
+app.use("/v1/comunidade/posts", postRoutes)
 app.use("/v1/sessao", sessaoRoutes)
 
 app.use((error, req, res, next) => {

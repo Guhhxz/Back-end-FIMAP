@@ -2,16 +2,27 @@ const config_message = require('../modulo/configMensagens.js')
 const BadgeModel = require('../../../model/DAO/Badge/badgeDAO.js')
 const BadgeUsuarioModel = require('../../../model/DAO/BadgeUser/badgeUserDAO.js')
 
+/* ------------------------------ Helpers ------------------------------ */
+
+// Busca a configuração de mensagem; cai em ERRO_INTERNO se a chave não existir
 const cfg = (chave) => config_message[chave] || config_message.ERRO_INTERNO
 
 const idValido = (valor) => Number.isInteger(valor) && valor > 0
 
-const respostaErro = (res, configuracao) => {
-    return res.status(configuracao.status).json({
+const respostaErro = (res, configuracao) =>
+    res.status(configuracao.status).json({
         sucesso: false,
         mensagem: configuracao.mensagem
     })
-}
+
+const respostaSucesso = (res, configuracao, extra = {}) =>
+    res.status(configuracao.status).json({
+        sucesso: true,
+        mensagem: configuracao.mensagem,
+        ...extra
+    })
+
+/* ----------------------------- Controllers ----------------------------- */
 
 // POST /badges/usuario
 // Body: { id_usuario, id_badge }
@@ -60,12 +71,7 @@ const AtrelarBadgeUsuario = async (req, res) => {
             return respostaErro(res, cfg('ERRO_CONQUISTAR_BADGE'))
         }
 
-        const mensagem = cfg('BADGE_VINCULADA_USUARIO')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem
-        })
+        return respostaSucesso(res, cfg('BADGE_VINCULADA_USUARIO'))
 
     } catch (error) {
         console.error('Erro ao atrelar badge:', error)
@@ -88,14 +94,11 @@ const BuscarBadgesUsuario = async (req, res) => {
             return respostaErro(res, cfg('ERRO_BUSCAR_BADGES_USUARIO'))
         }
 
-        const mensagem = cfg('BADGES_USUARIO_ENCONTRADOS')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem,
-            quantidade: badges.length,
-            badges
-        })
+        return respostaSucesso(
+            res,
+            cfg('BADGES_USUARIO_ENCONTRADOS'),
+            { quantidade: badges.length, badges }
+        )
 
     } catch (error) {
         console.error('Erro ao buscar badges do usuário:', error)
@@ -127,12 +130,7 @@ const RemoverBadgeUsuario = async (req, res) => {
             return respostaErro(res, cfg('BADGE_USUARIO_NAO_ENCONTRADO'))
         }
 
-        const mensagem = cfg('BADGE_USUARIO_REMOVIDO')
-
-        return res.status(mensagem.status).json({
-            sucesso: true,
-            mensagem: mensagem.mensagem
-        })
+        return respostaSucesso(res, cfg('BADGE_USUARIO_REMOVIDO'))
 
     } catch (error) {
         console.error('Erro ao remover badge do usuário:', error)
