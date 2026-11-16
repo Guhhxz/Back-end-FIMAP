@@ -8,6 +8,7 @@ router.post("/iniciar-chat", ChatController.CriarChat);
 
 router.get("/listar-chats/:id_usuario", ChatController.ListarChatsPorUsuario);
 router.get("/listar-chat/:id_chat", ChatController.ListaPorId);
+router.get("/listar-chats", ChatController.ListarTodosChats);
 
 router.delete("/apagar-chat/:id_chat", ChatController.ApagarChat);
 

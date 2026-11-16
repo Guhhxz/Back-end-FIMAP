@@ -119,6 +119,26 @@ async function obterInvestimentos(req, res) {
     }
 }
 
+async function obterEvolucaoInvestimentos(req, res) {
+    try {
+        const { itemId } = req.params
+        const { periodo = "1a" } = req.query
+
+        if (!itemId) {
+            return res.status(400).json({ erro: "Informe o itemId." })
+        }
+
+        const resultado = await pluggyService.listarEvolucaoInvestimentos(itemId, periodo)
+        return res.status(200).json(resultado)
+    } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ erro: error.message })
+        }
+        console.error("Erro ao buscar evolução de investimentos:", error)
+        return res.status(500).json({ erro: "Não foi possível buscar a evolução dos investimentos." })
+    }
+}
+
 async function obterEmprestimos(req, res) {
     try {
         const { itemId } = req.params
@@ -139,6 +159,40 @@ async function obterEmprestimos(req, res) {
     } catch (error) {
         console.error("Erro ao buscar empréstimos:", error)
         return res.status(500).json({ erro: "Não foi possível buscar os empréstimos." })
+    }
+}
+
+const obterEmprestimoPorId = async (req, res) => {
+    try {
+        const { itemId, emprestimoId } = req.params
+        const resultado = await pluggyService.buscarEmprestimo(itemId, emprestimoId)
+        res.status(200).json(resultado)
+    } catch (error) {
+        console.error('Erro ao obter empréstimo:', error)
+        res.status(error.status ?? 500).json({ mensagem: error.message ?? 'Erro ao obter o empréstimo.' })
+    }
+}
+
+const obterParcelasEmprestimo = async (req, res) => {
+    try {
+        const { itemId, emprestimoId } = req.params
+        const resultado = await pluggyService.listarParcelasEmprestimo(itemId, emprestimoId)
+        res.status(200).json(resultado)
+    } catch (error) {
+        console.error('Erro ao obter parcelas do empréstimo:', error)
+        res.status(error.status ?? 500).json({ mensagem: error.message ?? 'Erro ao obter as parcelas do empréstimo.' })
+    }
+}
+
+const obterDetalheEmprestimo = async (req, res) => {
+    try {
+        const { itemId, emprestimoId } = req.params
+        const { limitePagas } = req.query
+        const resultado = await pluggyService.obterDetalheEmprestimo(itemId, emprestimoId, { limitePagas })
+        res.status(200).json(resultado)
+    } catch (error) {
+        console.error('Erro ao obter detalhe do empréstimo:', error)
+        res.status(error.status ?? 500).json({ mensagem: error.message ?? 'Erro ao obter o detalhe do empréstimo.' })
     }
 }
 
@@ -199,7 +253,7 @@ async function obterResumosBancario(req, res) {
 async function adicionarConexao(req, res) {
     try {
         const { idUsuario } = req.params
-        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id } = req.body
+        const { status, consentimento_api, ultima_sincronizacao, provedor, external_connection_id, nome_instituicao } = req.body
 
         if (!idUsuario) {
             return res.status(400).json({ erro: "Informe o ID do usuário." })
@@ -215,6 +269,7 @@ async function adicionarConexao(req, res) {
             ultima_sincronizacao,
             provedor,
             external_connection_id,
+            nome_instituicao,
             id_usuario: idUsuario
         }
 
@@ -251,6 +306,38 @@ async function listarConexoes(req, res) {
     } catch (error) {
         console.error("Erro ao listar conexões:", error)
         return res.status(500).json({ erro: "Não foi possível listar as conexões." })
+    }
+}
+
+const deletarConexao = async (req, res) => {
+    try {
+        const { id_usuario, id } = req.params
+
+        const resultado = await conexaoDAO.DeleteConexao({
+            id,
+            id_usuario
+        })
+
+        if (!resultado) {
+            return res.status(404).json({
+                sucesso: false,
+                codigo: 'CONEXÃO_NÃO_ENCONTRADA',
+                mensagem: 'Conexão Não Encontrada.'
+            })
+        }
+
+        return res.status(200).json({
+            sucesso: true,
+            mensagem: 'Conexão deletada com sucesso!'
+        })
+
+    } catch (error) {
+        console.error('Erro ao deletar conexão:', error)
+        return res.status(500).json({
+            sucesso: false,
+            codigo: 'ERRO_INTERNO',
+            mensagem: 'Erro interno ao deletar conexão.'
+        })
     }
 }
 
@@ -373,6 +460,11 @@ module.exports = {
     listarConexoes,
     obterFaturaCartao,
     obterGastosCartao,
-    obterTransacoesCartao
+    obterTransacoesCartao,
+    obterEvolucaoInvestimentos,
+    obterEmprestimoPorId,
+    obterParcelasEmprestimo,
+    obterDetalheEmprestimo,
+    deletarConexao
 }
 

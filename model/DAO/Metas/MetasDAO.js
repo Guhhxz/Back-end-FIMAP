@@ -4,6 +4,14 @@ const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
+// O front manda data_alvo em ISO 8601 ('2030-11-01T15:00:00.000Z'). O MySQL
+// não aceita o 'T'/'Z'/milissegundos nesse formato pra DATETIME — convertendo
+// pra Date aqui, o mysql2 serializa certinho como 'YYYY-MM-DD HH:MM:SS'.
+const normalizarDataAlvo = (valor) => {
+    if (valor === undefined || valor === null) return valor
+    return valor instanceof Date ? valor : new Date(valor)
+}
+
 // Criar meta
 const CreateMeta = async (meta) => {
     const sql = `
@@ -14,12 +22,14 @@ const CreateMeta = async (meta) => {
             valor_inicio,
             valor_desejado,
             valor_total,
+            aporte_mensal,
             data_alvo,
             status,
             id_categoria,
+            id_conta_vinculada,
             id_usuario
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
 
     try {
@@ -29,9 +39,11 @@ const CreateMeta = async (meta) => {
             meta.valor_inicio,
             meta.valor_desejado,
             meta.valor_total,
-            meta.data_alvo,
+            meta.aporte_mensal,
+            normalizarDataAlvo(meta.data_alvo),
             meta.status,
             meta.id_categoria,
+            meta.id_conta_vinculada,
             meta.id_usuario
         ])
 
@@ -51,9 +63,11 @@ const UpdateMeta = async (meta) => {
         'valor_inicio',
         'valor_desejado',
         'valor_total',
+        'aporte_mensal',
         'data_alvo',
         'status',
-        'id_categoria'
+        'id_categoria',
+        'id_conta_vinculada'
     ]
 
     const camposAtualizados = camposPermitidos.filter(
@@ -69,7 +83,7 @@ const UpdateMeta = async (meta) => {
         .join(', ')
 
     const valores = camposAtualizados.map(
-        (campo) => meta[campo]
+        (campo) => (campo === 'data_alvo' ? normalizarDataAlvo(meta[campo]) : meta[campo])
     )
 
     const sql = `
@@ -127,9 +141,11 @@ const GetAllMetasUsuario = async (id_usuario) => {
                 'valor_inicio',
                 'valor_desejado',
                 'valor_total',
+                'aporte_mensal',
                 'data_alvo',
                 'status',
-                'id_categoria'
+                'id_categoria',
+                'id_conta_vinculada'
             )
             .where('id_usuario', id_usuario)
             .orderBy('data_alvo', 'asc')
@@ -140,17 +156,47 @@ const GetAllMetasUsuario = async (id_usuario) => {
     }
 }
 
-// Buscar todas as categorias de metas do usuário
+// Buscar todas as categorias disponíveis para o usuário
+// (padrão do sistema, com id_usuario NULL, + personalizadas dele)
 const GetAllCategoriasMeta = async (id_usuario) => {
     try {
         return await knexConex('tbl_categoria_meta')
             .select(
                 'id',
-                'nome'
+                'nome',
+                'id_usuario'
             )
+            .where('id_usuario', id_usuario)
+            .orWhereNull('id_usuario')
+            .orderBy('nome', 'asc')
 
     } catch (error) {
         console.error('Erro ao listar categorias do usuário:', error)
+        return false
+    }
+}
+
+// Criar categoria personalizada vinculada ao usuário
+const CreateCategoria = async (categoria) => {
+    const sql = `
+        INSERT INTO tbl_categoria_meta
+        (
+            nome,
+            id_usuario
+        )
+        VALUES (?, ?)
+    `
+
+    try {
+        const [result] = await knexConex.raw(sql, [
+            categoria.nome,
+            categoria.id_usuario
+        ])
+
+        return result.insertId
+
+    } catch (error) {
+        console.error('Erro ao criar categoria:', error)
         return false
     }
 }
@@ -166,9 +212,11 @@ const GetMetaById = async (id_usuario, id_meta) => {
                 'valor_inicio',
                 'valor_desejado',
                 'valor_total',
+                'aporte_mensal',
                 'data_alvo',
                 'status',
-                'id_categoria'
+                'id_categoria',
+                'id_conta_vinculada'
             )
             .where('id_usuario', id_usuario)
             .andWhere('id', id_meta)
@@ -185,5 +233,6 @@ module.exports = {
     DeleteMeta,
     GetAllMetasUsuario,
     GetAllCategoriasMeta,
+    CreateCategoria,
     GetMetaById
 }

@@ -87,6 +87,7 @@ const config_message = {
     // ==========================================
     ID_INVALIDO: {
         status: 400,
+        codigo: 'ID_INVALIDO',
         mensagem: 'O ID informado é inválido.'
     },
     ID_OBRIGATORIO: {
@@ -95,6 +96,7 @@ const config_message = {
     },
     PARAMETRO_INVALIDO: {
         status: 400,
+        codigo: 'PARAMETRO_INVALIDO',
         mensagem: 'Um ou mais parâmetros da requisição são inválidos.'
     },
     PAGINACAO_INVALIDA: {
@@ -199,7 +201,7 @@ const config_message = {
     },
     SENHA_INVALIDA: {
         status: 422,
-        mensagem: 'A senha não atende aos critérios exigidos.'
+        mensagem: 'A senha não atende aos critérios exigidos ou usuário não encontrado.'
     },
     SENHA_ATUAL_INCORRETA: {
         status: 401,
@@ -231,6 +233,7 @@ const config_message = {
     },
     ID_USUARIO_INVALIDO: {
         status: 400,
+        codigo: 'ID_USUARIO_INVALIDO',
         mensagem: 'O ID do usuário informado é inválido.'
     },
     ID_USUARIO_OBRIGATORIO: {
@@ -239,6 +242,7 @@ const config_message = {
     },
     USUARIO_NAO_ENCONTRADO: {
         status: 404,
+        codigo: 'USUARIO_NAO_ENCONTRADO',
         mensagem: 'Usuário não encontrado.'
     },
     EMAIL_EXISTENTE: {
@@ -575,26 +579,42 @@ const config_message = {
     // ==========================================
     NOTIFICACAO_CRIADA: {
         status: 201,
+        codigo: 'NOTIFICACAO_CRIADA',
         mensagem: 'Notificação criada com sucesso.'
     },
     NOTIFICACAO_ENCONTRADA: {
         status: 200,
+        codigo: 'NOTIFICACAO_ENCONTRADA',
         mensagem: 'Notificação encontrada com sucesso.'
     },
     NOTIFICACOES_ENCONTRADAS: {
         status: 200,
+        codigo: 'NOTIFICACOES_ENCONTRADAS',
         mensagem: 'Notificações consultadas com sucesso.'
     },
     NOTIFICACAO_LIDA: {
         status: 200,
+        codigo: 'NOTIFICACAO_LIDA',
         mensagem: 'Notificação marcada como lida.'
     },
     NOTIFICACOES_LIDAS: {
         status: 200,
+        codigo: 'NOTIFICACOES_LIDAS',
         mensagem: 'Todas as notificações foram marcadas como lidas.'
+    },
+    NOTIFICACOES_NAO_LIDAS: {
+        status: 200,
+        codigo: 'NOTIFICACOES_NAO_LIDAS',
+        mensagem: 'Contagem de notificações não lidas obtida com sucesso.'
+    },
+    NOTIFICACOES_LIDAS_CONTAGEM: {
+        status: 200,
+        codigo: 'NOTIFICACOES_LIDAS_CONTAGEM',
+        mensagem: 'Contagem de notificações lidas obtida com sucesso.'
     },
     NOTIFICACAO_DELETADA: {
         status: 200,
+        codigo: 'NOTIFICACAO_DELETADA',
         mensagem: 'Notificação excluída com sucesso.'
     },
     NOME_NOTIFICACAO_OBRIGATORIO: {
@@ -615,30 +635,37 @@ const config_message = {
     },
     ID_NOTIFICACAO_INVALIDO: {
         status: 400,
+        codigo: 'ID_NOTIFICACAO_INVALIDO',
         mensagem: 'O ID da notificação informado é inválido.'
     },
     NOTIFICACAO_NAO_ENCONTRADA: {
         status: 404,
+        codigo: 'NOTIFICACAO_NAO_ENCONTRADA',
         mensagem: 'Notificação não encontrada.'
     },
     NOTIFICACAO_JA_LIDA: {
         status: 409,
+        codigo: 'NOTIFICACAO_JA_LIDA',
         mensagem: 'Esta notificação já foi marcada como lida.'
     },
     ERRO_CRIAR_NOTIFICACAO: {
         status: 500,
+        codigo: 'ERRO_CRIAR_NOTIFICACAO',
         mensagem: 'Não foi possível criar a notificação.'
     },
     ERRO_BUSCAR_NOTIFICACOES: {
         status: 500,
+        codigo: 'ERRO_BUSCAR_NOTIFICACOES',
         mensagem: 'Não foi possível consultar as notificações.'
     },
     ERRO_ATUALIZAR_NOTIFICACAO: {
         status: 500,
+        codigo: 'ERRO_ATUALIZAR_NOTIFICACAO',
         mensagem: 'Não foi possível atualizar a notificação.'
     },
     ERRO_DELETAR_NOTIFICACAO: {
         status: 500,
+        codigo: 'ERRO_DELETAR_NOTIFICACAO',
         mensagem: 'Não foi possível excluir a notificação.'
     },
 

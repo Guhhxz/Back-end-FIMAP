@@ -11,9 +11,12 @@ router.post("/codigo-otp/senha/:id_usuario", usuarioController.solicitarOTPAlter
 router.post("/alterar/verificar-codigo/:id_usuario", usuarioController.verificarCodigoAlteracaoSenha)
 router.post("/login", usuarioController.login)
 router.post("/consultar/otp/:id_usuario", usuarioController.validarCodigoOTP)
+router.post("/alterar/verificar-senha-atual/:id_usuario", usuarioController.verificarSenhaAtual)
 
 // Atualizar usuário
 router.patch("/usuario-update/:id_usuario", usuarioController.atualizarUsuario)
+router.patch("/alterar/senha-atual/:id_usuario", usuarioController.alterarSenhaComSenhaAtual)
+
 
 // Buscar usuários
 router.get("/usuario/:username", usuarioController.buscarUsuarioPorUsername)

@@ -16,4 +16,5 @@ router.get("/buscar/:id_post", postController.BuscarPostPorId);
 router.patch("/atualizar/:id_post", postController.AtualizarPost);                       
 router.delete("/deletar/:id_post", postController.ApagarPost);                            
 
-module.exports = router;
+
+module.exports = router
