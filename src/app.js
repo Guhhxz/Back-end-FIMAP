@@ -1,71 +1,73 @@
-﻿// Importando as dependências
-require("dotenv").config({
-    path: require("path").resolve(__dirname, "../.env")
+﻿// Variáveis de ambiente
+require('dotenv').config({
+    path: require('path').resolve(__dirname, '../.env')
 })
 
-const express = require("express")
-const cors = require("cors")
+const express = require('express')
+const cors = require('cors')
 
-// Importando rotas e controllers
-const openFinanceRoutes = require('../src/routes/openFinanceRoutes.js')
+// Rotas
+const openFinanceRoutes = require('./routes/openFinanceRoutes.js')
 const usuarioRoutes = require('./routes/usuarioRoutes.js')
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
 const chatRoutes = require('./routes/chatRoutes.js')
-const postRoutes = require("./routes/postRoutes.js")
-const seguir_seguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
+const postRoutes = require('./routes/postRoutes.js')
+const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
 const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
-const sessaoRoutes = require('./routes/sessaoRoutes.js')
-const postRoutes = require("./routes/postRoutes.js")
+// const sessaoRoutes = require('./routes/sessaoRoutes.js') // importada mas nunca montada
 
-//exportanto jobs
+// Jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
+
+const PORT = process.env.PORT || 8080
+
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}
 
 const app = express()
 
-const corsOption = {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-}
+/* ---------------------------- Middlewares ---------------------------- */
 
-app.use(cors(corsOption))
-app.use(express.json({ limit: "192kb" }))
+app.use(cors(corsOptions))
+app.use(express.json({ limit: '192kb' }))
 app.use(express.urlencoded({ extended: true }))
 
-app.get('/ping', (req, res) => {
-    return res.status(200).json({ status: 'API funcionando no Render!'});
-  });
+/* ------------------------------- Rotas ------------------------------- */
 
-// Endpoints do Swagger para consultar e enviar mensagens de um chat
-// app.get("/v1/ia/chats/:chatId/mensagens", mensagemChatController.listarMensagensChat)
-// app.post("/v1/ia/chats/:chatId/mensagens", mensagemChatController.enviarMensagemChat)
-app.use("/v1/ia/chat/", chatRoutes)
-app.use("/v1/openfinance", openFinanceRoutes)
-app.use("/v1/openfinance/usuario", usuarioRoutes)
-app.use("/v1/seguindo", seguir_seguidoresRoutes)
-app.use("/v1/configuracoes", configuracoesRoutes)
-app.use("/v1/openfinance/metas", metasRoutes)
-app.use("/v1/badge", badgeRoutes)
-app.use("/v1", simulacoesRoutes)
-app.use("/v1/notificacoes", notificacaoRoutes)
-app.use("/v1/comunidade/posts", postRoutes)
-const PORT = process.env.PORT || 8080
+app.get('/ping', (req, res) => {
+    return res.status(200).json({ status: 'API funcionando no Render!' })
+})
+
+app.use('/v1/ia/chat', chatRoutes)
+app.use('/v1/openfinance', openFinanceRoutes)
+app.use('/v1/openfinance/usuario', usuarioRoutes)
+app.use('/v1/openfinance/metas', metasRoutes)
+app.use('/v1/seguindo', seguirSeguidoresRoutes)
+app.use('/v1/configuracoes', configuracoesRoutes)
+app.use('/v1/badge', badgeRoutes)
+app.use('/v1', simulacoesRoutes)
+app.use('/v1/notificacoes', notificacaoRoutes)
+app.use('/v1/comunidade/posts', postRoutes)
+
+/* ----------------------------- Servidor ----------------------------- */
 
 const servidor = app.listen(PORT, (erro) => {
     if (erro) {
-        console.error("Erro ao subir o servidor:", erro)
+        console.error('Erro ao subir o servidor:', erro)
         process.exit(1)
     }
+
     console.log(`Servidor rodando na porta ${PORT}`)
     investimentoSnapshotJob.agendar()
 })
 
-
-
-servidor.on("error", (erro) => {
-    console.error("Erro no servidor:", erro)
+servidor.on('error', (erro) => {
+    console.error('Erro no servidor:', erro)
     process.exit(1)
 })

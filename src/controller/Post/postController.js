@@ -1,62 +1,57 @@
 const config_message = require('../modulo/configMensagens.js')
-const postDAO = require('../../../model/DAO/Post/postDAO.js')
+const postDAO = require('../../../model/DAO/Post/PostDAO.js')
 const { UploadArquivo, UploadUrl, ExcluirVarias } = require('../../services/cloudinary.js')
-// ============================================================
-// CONSTANTES
-// ============================================================
+
+/* ============================ CONSTANTES ============================ */
 
 // Valor da coluna "status" para post visível. Post removido tem status 0.
 const STATUS_ATIVO = 1
 
-// Tamanho máximo do texto de um post. Evita textos gigantes no banco.
+// Tamanho máximo do texto de um post
 const TEXTO_MAX_CARACTERES = 2000
 
-// Quantidade máxima de fotos + vídeos por post. Como os uploads vão em paralelo,
-// o limite também evita sobrecarregar o servidor e o Cloudinary.
+// Máximo de fotos + vídeos por post (uploads vão em paralelo, então o limite
+// também protege o servidor e o Cloudinary)
 const ARQUIVOS_MAX_POR_POST = 10
 
-// Tipos permitidos dentro do array "conteudo" salvo no banco.
-// Exemplo: [{ tipo: 'texto', valor: 'Olá' }, { tipo: 'foto', valor: 'https://...' }]
+// Tipos permitidos no array "conteudo" salvo no banco.
+// Ex.: [{ tipo: 'texto', valor: 'Olá' }, { tipo: 'foto', valor: 'https://...' }]
 const TIPOS = ['texto', 'foto', 'video']
 
-// ============================================================
-// HELPERS (funções auxiliares, não são rotas)
-// ============================================================
+/* ======================= HELPERS: RESPOSTAS/ENTRADA ======================= */
 
-// Confere se o id é um número inteiro maior que zero.
-// Recebe o resultado de Number(...). Se vier NaN, texto ou negativo, retorna false.
-// Por isso Number("12abc") (NaN) é barrado antes de chegar ao banco.
+// Id inteiro maior que zero (recebe o resultado de Number(...); NaN é barrado)
 const idValido = (id) => Number.isInteger(id) && id > 0
 
-// Envia uma resposta de ERRO no padrão do projeto: { sucesso: false, mensagem }.
-// Recebe um objeto do configMensagens.js (ex.: config_message.POST_NAO_ENCONTRADO),
-// que traz o código HTTP (status) e o texto (mensagem).
-// Se o objeto não tiver "status", res.status(undefined) lança erro.
+// { sucesso: false, mensagem } a partir de um objeto do configMensagens.js
 const responderErro = (res, cfg) =>
     res.status(cfg.status).json({ sucesso: false, mensagem: cfg.mensagem })
 
-// Envia uma resposta de SUCESSO no padrão do projeto: { sucesso: true, mensagem, ...dados }.
-// O terceiro parâmetro é opcional e traz o que mais deve ir na resposta
-// (ex.: { post } ou { quantidade, posts }). O spread (...dados) junta tudo no mesmo JSON.
+// { sucesso: true, mensagem, ...dados }
 const responderSucesso = (res, cfg, dados = {}) =>
     res.status(cfg.status).json({ sucesso: true, mensagem: cfg.mensagem, ...dados })
 
+// Lê um id da URL aceitando mais de um nome de parâmetro
+// (ex.: lerParam(req, 'usuarioId', 'id_usuario')). Sem nenhum deles, retorna NaN.
+const lerParam = (req, ...nomes) => {
+    for (const nome of nomes) {
+        if (req.params?.[nome] !== undefined) return Number(req.params[nome])
+    }
+
+    return NaN
+}
+
 // Descobre qual usuário está fazendo a requisição.
-// TEMPORÁRIO: lê o id do body ou da query string, então qualquer pessoa pode enviar o id de
-// outro usuário e se passar por ele. Quando o login com token estiver pronto,
+// TEMPORÁRIO: lê o id do body ou da query, então qualquer pessoa pode enviar o id
+// de outro usuário e se passar por ele. Quando o login com token estiver pronto,
 // troque por req.usuario.id (vindo do middleware de autenticação).
-// Se o id não vier, Number(undefined) dá NaN e o idValido barra depois.
 const idDoUsuarioLogado = (req) => Number(req.body?.id_usuario ?? req.query?.id_usuario)
 
-// Extrai o texto do post da requisição.
-// O front pode mandar o texto de duas formas:
-//   - JSON ou multipart já parseado: req.body.conteudo.texto
-//   - multipart "cru":               req.body['conteudo[texto]']
-// Retornos possíveis:
-//   - ''     → nenhum texto enviado (válido, o post pode não ter texto)
-//   - null   → o valor existe mas não é string (ex.: número ou objeto), ou seja, inválido
-//   - string → texto sem espaços nas pontas
-
+// Extrai o texto do post da requisição. O front pode mandar de três formas:
+//   - array em req.body.conteudo: [{ tipo: 'texto', valor }]
+//   - objeto em req.body.conteudo: { texto }
+//   - multipart "cru": req.body['conteudo[texto]']
+// Retorna: '' (sem texto, válido) | null (existe mas não é string) | string com trim
 const lerTexto = (req) => {
     const conteudo = req.body?.conteudo
 
@@ -75,55 +70,33 @@ const lerTexto = (req) => {
     return bruto.trim()
 }
 
+// Texto inválido = não é string (null) ou passa do limite
+const textoInvalido = (texto) => texto === null || texto.length > TEXTO_MAX_CARACTERES
 
-
-const enviarUrls = async (itens, pasta, enviadas) => {
-    const resultados = await Promise.allSettled(
-        itens.map(async item => {
-            const url = await UploadUrl(item.valor, pasta, item.tipo)
-
-            return {
-                tipo: item.tipo,
-                valor: url
-            }
-        })
-    )
-
-    const conteudo = []
-    let erro = null
-
-    resultados.forEach(resultado => {
-        if (resultado.status === 'fulfilled') {
-            enviadas.push(resultado.value.valor)
-            conteudo.push(resultado.value)
-        } else {
-            erro = erro ?? resultado.reason
-        }
-    })
-
-    if (erro) throw erro
-
-    return conteudo
+// URL válida e https
+const urlHttpsValida = (valor) => {
+    try {
+        return new URL(valor).protocol === 'https:'
+    } catch (_) {
+        return false
+    }
 }
 
+/* ========================= HELPERS: CONTEÚDO ========================= */
 
-// Confere se UM item do array de conteúdo tem o formato correto:
-// precisa ser objeto, ter "tipo" dentro de TIPOS e "valor" do tipo string.
-// Usado em lerConteudo para descartar itens corrompidos.
+// Um item do array de conteúdo precisa ser objeto, ter "tipo" dentro de TIPOS
+// e "valor" string. Usado para descartar itens corrompidos.
 const itemValido = (item) =>
     item && typeof item === 'object' && TIPOS.includes(item.tipo) && typeof item.valor === 'string'
 
-// Converte o que está na coluna "conteudo" do banco para o array [{ tipo, valor }].
-// Existe porque o banco pode ter o conteúdo em formatos diferentes, e a resposta
-// da API tem que ser sempre a mesma. Formatos aceitos:
-//   1. Array novo (como string JSON ou já parseado): é só filtrado com itemValido.
-//      Um array vazio ('[]') é válido e devolve [] (post sem texto e sem mídia).
-//   2. Objeto antigo { texto, foto: [], midia: [] }: convertido para o array novo,
-//      e "midia" vira tipo "video".
+// Converte o que está na coluna "conteudo" para o array [{ tipo, valor }].
+// A resposta da API precisa ser sempre a mesma, mesmo com formatos antigos no banco:
+//   1. Array novo (string JSON ou já parseado): filtrado com itemValido.
+//      '[]' é válido e devolve [] (post sem texto e sem mídia).
+//   2. Objeto antigo { texto, foto: [], midia: [] }: "midia" vira tipo "video".
 //   3. Texto puro (post muito antigo): vira [{ tipo: 'texto', valor }].
-//   4. Qualquer coisa inválida ou vazia: retorna [].
-// O mysql2 devolve colunas do tipo JSON já parseadas, por isso o
-// JSON.parse só roda quando o valor chega como string.
+//   4. Qualquer coisa inválida ou vazia: [].
+// O mysql2 devolve colunas JSON já parseadas, por isso o JSON.parse só roda em string.
 const lerConteudo = (valor) => {
     let c = valor
 
@@ -152,10 +125,8 @@ const lerConteudo = (valor) => {
     return typeof valor === 'string' && valor ? [{ tipo: 'texto', valor }] : []
 }
 
-// Transforma a linha crua do banco no objeto que a API devolve ao front.
-// - status: número (1/0) vira texto ('ativo'/'inativo'). Number() evita erro quando
-//   o driver devolve o valor como string ou BigInt.
-// - conteudo: sempre passa por lerConteudo, então o front recebe sempre um array.
+// Linha crua do banco -> objeto que a API devolve ao front.
+// Number() no status evita erro quando o driver devolve string ou BigInt.
 const formatarPost = (p) => ({
     id: p.id,
     data_criacao: p.data_criacao,
@@ -165,46 +136,66 @@ const formatarPost = (p) => ({
     conteudo: lerConteudo(p.conteudo)
 })
 
-// Envia vários arquivos ao Cloudinary ao mesmo tempo e devolve os itens
-// prontos para o array de conteúdo: [{ tipo: 'foto' | 'video', valor: url }].
-// Parâmetros:
-//   - arquivos: lista de arquivos do multer (cada um com buffer e mimetype)
-//   - pasta:    pasta de destino no Cloudinary (ex.: 'posts/12')
-//   - enviadas: array que serve como "caderno de registro". Cada URL enviada com sucesso
-//               é anotada ali, para o catch do criarPost poder apagá-las se algo falhar depois.
-// Detalhes:
-//   - Usa Promise.allSettled, não Promise.all. Assim, se um upload falhar, os outros
-//     terminam e suas URLs entram em "enviadas", e nada fica órfão no Cloudinary.
-//   - O tipo vem do mimetype ('video/...' vira video, o resto vira foto), não do nome do campo.
-//   - A ordem do resultado é a mesma dos arquivos enviados.
-//   - Se qualquer upload falhou, lança o primeiro erro DEPOIS de registrar os sucessos.
-//   - Se a lista de arquivos vier vazia, devolve [] sem chamar o Cloudinary.
-const enviarArquivos = async (arquivos, pasta, enviadas) => {
-    const resultados = await Promise.allSettled(arquivos.map(a => UploadArquivo(a, pasta)))
+/* ========================== HELPERS: UPLOADS ========================== */
+
+// Processa o resultado de um Promise.allSettled de uploads.
+//   - Cada URL enviada com sucesso é anotada em "enviadas" (caderno de registro
+//     usado pelo rollback do criarPost) e transformada em item de conteúdo.
+//   - Se algum upload falhou, lança o primeiro erro DEPOIS de registrar os sucessos,
+//     então nada fica órfão no Cloudinary.
+//   - A ordem do resultado é a mesma da lista enviada.
+const coletarUploads = (resultados, transformar, enviadas) => {
     const itens = []
     let erro = null
 
-    resultados.forEach((r, i) => {
-        if (r.status === 'fulfilled') {
-            enviadas.push(r.value)
-            itens.push({
-                tipo: arquivos[i].mimetype.startsWith('video/') ? 'video' : 'foto',
-                valor: r.value
-            })
+    resultados.forEach((resultado, i) => {
+        if (resultado.status === 'fulfilled') {
+            enviadas.push(resultado.value)
+            itens.push(transformar(resultado.value, i))
         } else {
-            erro = erro ?? r.reason
+            erro = erro ?? resultado.reason
         }
     })
 
     if (erro) throw erro
+
     return itens
 }
 
-// Rollback dos uploads: apaga do Cloudinary as URLs recebidas.
-// NÃO é um handler Express (não recebe req/res). É chamada no catch do criarPost
-// quando o post não foi criado, para não deixar arquivos órfãos gastando espaço.
-// Nunca lança erro: se a limpeza falhar, só registra no console,
-// para não esconder o erro original que o usuário deveria receber.
+// Envia URLs externas ao Cloudinary. Devolve [{ tipo, valor: urlNova }]
+const enviarUrls = async (itens, pasta, enviadas) => {
+    const resultados = await Promise.allSettled(
+        itens.map(async item => UploadUrl(item.valor, pasta, item.tipo))
+    )
+
+    return coletarUploads(
+        resultados,
+        (url, i) => ({ tipo: itens[i].tipo, valor: url }),
+        enviadas
+    )
+}
+
+// Envia arquivos do multer (buffer + mimetype) ao Cloudinary em paralelo.
+// O tipo vem do mimetype ('video/...' vira video, o resto vira foto), não do nome do campo.
+// Lista vazia devolve [] sem chamar o Cloudinary.
+const enviarArquivos = async (arquivos, pasta, enviadas) => {
+    const resultados = await Promise.allSettled(
+        arquivos.map(arquivo => UploadArquivo(arquivo, pasta))
+    )
+
+    return coletarUploads(
+        resultados,
+        (url, i) => ({
+            tipo: arquivos[i].mimetype.startsWith('video/') ? 'video' : 'foto',
+            valor: url
+        }),
+        enviadas
+    )
+}
+
+// Rollback: apaga do Cloudinary as URLs recebidas. Não é handler Express.
+// Nunca lança erro: se a limpeza falhar, só registra no console para não
+// esconder o erro original que o usuário deveria receber.
 const desfazerUploads = async (urls) => {
     if (!urls.length) return
 
@@ -215,23 +206,20 @@ const desfazerUploads = async (urls) => {
     }
 }
 
-// ============================================================
-// ENDPOINTS (funções ligadas às rotas)
-// ============================================================
+/* ============================ ENDPOINTS ============================ */
 
-// POST /posts
-// Cria um post com texto, fotos e vídeos. Os três são OPCIONAIS: o post pode ter
-// qualquer combinação, inclusive nenhum (nesse caso "conteudo" fica []). Passo a passo:
-//   1. Identifica o usuário e valida o texto e a quantidade de arquivos.
-//   2. Sobe fotos e vídeos ao Cloudinary (em paralelo) e recebe as URLs.
+// POST /criar
+// Cria um post com texto, fotos e vídeos, todos OPCIONAIS (pode ser qualquer
+// combinação, inclusive nenhuma: "conteudo" fica []). Passos:
+//   1. Identifica o usuário e valida texto, itens, URLs e quantidade de arquivos.
+//   2. Sobe URLs e arquivos ao Cloudinary (em paralelo).
 //   3. Monta o array [{ tipo, valor }] (texto primeiro, depois a mídia).
 //   4. Grava o array como JSON na coluna "conteudo".
 //   5. Busca o post recém-criado e devolve formatado.
-// Controle de falhas: "enviadas" guarda as URLs já subidas. Se algo falhar ANTES
-// do INSERT, o catch apaga esses arquivos. Depois do INSERT o post existe, então
-// "enviadas" é zerada (enviadas.length = 0) para que um erro posterior
-// (ex.: no GetPostById) não apague arquivos de um post válido.
-
+// Falhas: "enviadas" guarda as URLs já subidas. Se algo falhar ANTES do INSERT,
+// o catch apaga esses arquivos. Depois do INSERT o post existe, então "enviadas"
+// é zerada para que um erro posterior (ex.: no GetPostById) não apague arquivos
+// de um post válido.
 const criarPost = async (req, res) => {
     const enviadas = []
 
@@ -242,50 +230,41 @@ const criarPost = async (req, res) => {
             return responderErro(res, config_message.NAO_AUTENTICADO)
         }
 
+        // Valida o usuário antes de qualquer upload ao Cloudinary
+        if (!await postDAO.ExisteUsuario(id_usuario)) {
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
+        }
+
         const texto = lerTexto(req)
 
-        if (texto === null || texto.length > TEXTO_MAX_CARACTERES) {
+        if (textoInvalido(texto)) {
             return responderErro(res, config_message.CONTEUDO_POST_INVALIDO)
         }
 
-        // Arquivos enviados pela galeria através do Multer
+        // Arquivos enviados pela galeria (multer)
         const fotos = req.files?.['conteudo[foto]'] ?? []
         const videos = req.files?.['conteudo[midia]'] ?? []
         const arquivos = [...fotos, ...videos]
 
-        // Conteúdo recebido diretamente pelo JSON
+        // Itens recebidos diretamente pelo JSON
         const conteudoRecebido = req.body?.conteudo
-        const itensJSON = Array.isArray(conteudoRecebido)
-            ? conteudoRecebido
-            : []
+        const itensJSON = Array.isArray(conteudoRecebido) ? conteudoRecebido : []
 
-        // Valida o formato dos itens recebidos pelo JSON
+        // Texto vazio é permitido (o texto é opcional); foto e vídeo precisam de valor
         if (itensJSON.some(item =>
-            !itemValido(item) ||
-            !item.valor.trim()
+            !itemValido(item) || (item.tipo !== 'texto' && !item.valor.trim())
         )) {
             return responderErro(res, config_message.CONTEUDO_POST_INVALIDO)
         }
 
-        // Separa somente imagens e vídeos enviados por URL
-        const urls = itensJSON.filter(item =>
-            item.tipo === 'foto' || item.tipo === 'video'
-        )
+        // Só fotos e vídeos enviados por URL (o texto já foi lido em lerTexto)
+        const urls = itensJSON.filter(item => item.tipo === 'foto' || item.tipo === 'video')
 
         // Valida as URLs antes de iniciar os uploads
-        for (const item of urls) {
-            try {
-                const endereco = new URL(item.valor)
-
-                if (endereco.protocol !== 'https:') {
-                    return responderErro(res, config_message.CONTEUDO_POST_INVALIDO)
-                }
-            } catch (_) {
-                return responderErro(res, config_message.CONTEUDO_POST_INVALIDO)
-            }
+        if (urls.some(item => !urlHttpsValida(item.valor))) {
+            return responderErro(res, config_message.CONTEUDO_POST_INVALIDO)
         }
 
-        // Limite total de arquivos por publicação
         if (arquivos.length + urls.length > ARQUIVOS_MAX_POR_POST) {
             return responderErro(res, config_message.LIMITE_ARQUIVOS_POST)
         }
@@ -293,25 +272,13 @@ const criarPost = async (req, res) => {
         const pasta = `posts/${id_usuario}`
         const conteudo = []
 
-        // Adiciona o texto
         if (texto) {
-            conteudo.push({
-                tipo: 'texto',
-                valor: texto
-            })
+            conteudo.push({ tipo: 'texto', valor: texto })
         }
 
-        // Envia URLs externas para o Cloudinary
-        conteudo.push(
-            ...await enviarUrls(urls, pasta, enviadas)
-        )
+        conteudo.push(...await enviarUrls(urls, pasta, enviadas))
+        conteudo.push(...await enviarArquivos(arquivos, pasta, enviadas))
 
-        // Envia arquivos da galeria para o Cloudinary
-        conteudo.push(
-            ...await enviarArquivos(arquivos, pasta, enviadas)
-        )
-
-        // Salva o conteúdo com as URLs retornadas pelo Cloudinary
         const id_post = await postDAO.CreatePost({
             conteudo: JSON.stringify(conteudo),
             id_usuario
@@ -329,6 +296,19 @@ const criarPost = async (req, res) => {
     } catch (error) {
         await desfazerUploads(enviadas)
 
+        // Rede de segurança: usuário removido entre a validação e o INSERT (FK_USUARIO_POST)
+        if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+            return responderErro(res, config_message.USUARIO_NAO_ENCONTRADO)
+        }
+
+        // O Cloudinary recusou a URL ou o arquivo (link inexistente, privado, corrompido...)
+        if (error?.http_code === 400) {
+            return responderErro(res, {
+                status: 400,
+                mensagem: 'Não foi possível carregar a foto ou o vídeo enviado. Verifique se o link é público e válido.'
+            })
+        }
+
         console.error('Erro ao criar post:', error)
 
         if (error.message === 'Tipo de arquivo não permitido.') {
@@ -339,13 +319,12 @@ const criarPost = async (req, res) => {
     }
 }
 
-
-// GET /posts/:postId
-// Busca UM post pelo id. Só devolve posts ativos: se o post não existe OU foi
-// removido, a resposta é a mesma (404), para não revelar que um post removido existiu.
+// GET /buscar/:postId
+// Busca UM post ativo. Se não existe OU foi removido, a resposta é a mesma (404),
+// para não revelar que um post removido existiu.
 const buscarPostPorId = async (req, res) => {
     try {
-        const id_post = Number(req.params.postId)
+        const id_post = lerParam(req, 'postId', 'id_post')
 
         if (!idValido(id_post)) {
             return responderErro(res, config_message.ID_POST_INVALIDO)
@@ -360,19 +339,19 @@ const buscarPostPorId = async (req, res) => {
         return responderSucesso(res, config_message.POST_ENCONTRADO, {
             post: formatarPost(post)
         })
+
     } catch (error) {
         console.error('Erro ao buscar post:', error)
         return responderErro(res, config_message.ERRO_BUSCAR_POST)
     }
 }
 
-// GET /usuarios/:usuarioId/posts
-// Lista os posts ATIVOS de um usuário (perfil público). O id vem da URL,
-// porque qualquer pessoa pode ver os posts de outra. Devolve também a "quantidade".
-// Se o usuário não tiver posts, a resposta é sucesso com lista vazia (não é erro).
+// GET /buscar/post/:usuarioId
+// Lista os posts ATIVOS de um usuário (perfil público: o id vem da URL).
+// Sem posts, a resposta é sucesso com lista vazia.
 const listarPostsPorUsuario = async (req, res) => {
     try {
-        const id_usuario = Number(req.params.usuarioId)
+        const id_usuario = lerParam(req, 'usuarioId', 'id_usuario')
 
         if (!idValido(id_usuario)) {
             return responderErro(res, config_message.ID_USUARIO_INVALIDO)
@@ -385,20 +364,22 @@ const listarPostsPorUsuario = async (req, res) => {
             quantidade: formatados.length,
             posts: formatados
         })
+
     } catch (error) {
         console.error('Erro ao listar posts:', error)
         return responderErro(res, config_message.ERRO_BUSCAR_POSTS)
     }
 }
 
-// GET /posts/removidos
-// Lista os posts REMOVIDOS (status = 0) do usuário logado. Diferente da listagem
-// pública, aqui o id NÃO vem da URL, vem do usuário logado, para que cada um
-// só veja os próprios posts removidos. Depende de idDoUsuarioLogado,
-// que ainda é temporário (ver aviso no helper).
+// GET /buscar/post-inativo/:usuarioId
+// Lista os posts REMOVIDOS (status = 0) de um usuário.
+// TEMPORÁRIO: o id vem da URL (com fallback para idDoUsuarioLogado), então qualquer
+// pessoa consegue ver os removidos de outra. Com o login por token, use somente
+// req.usuario.id para cada um ver só os próprios posts removidos.
 const listarPostsInativos = async (req, res) => {
     try {
-        const id_usuario = idDoUsuarioLogado(req)
+        const idDaUrl = lerParam(req, 'usuarioId', 'id_usuario')
+        const id_usuario = Number.isNaN(idDaUrl) ? idDoUsuarioLogado(req) : idDaUrl
 
         if (!idValido(id_usuario)) {
             return responderErro(res, config_message.NAO_AUTENTICADO)
@@ -411,24 +392,22 @@ const listarPostsInativos = async (req, res) => {
             quantidade: formatados.length,
             posts: formatados
         })
+
     } catch (error) {
         console.error('Erro ao listar posts removidos:', error)
         return responderErro(res, config_message.ERRO_BUSCAR_POSTS)
     }
 }
 
-// PUT /posts/:postId
-// Edita SOMENTE o texto do post. Fotos e vídeos continuam como estavam. Ordem das verificações:
-//   1. ids válidos (post e usuário)
-//   2. texto válido
-//   3. post existe e está ativo (senão 404)
-//   4. o post é do usuário logado (senão 403)
-// Para montar o novo conteúdo: pega o array atual, separa só a mídia (tudo que não é
-// 'texto') e coloca o texto novo na frente. Se o texto vier vazio, o texto é removido
-// do post. Se não sobrar mídia, o post fica com conteudo = [], o que é permitido.
+// PATCH /atualizar/:postId
+// Edita SOMENTE o texto do post; fotos e vídeos ficam como estavam.
+// Ordem das verificações: ids válidos -> texto válido -> post existe e ativo (404)
+// -> post é do usuário logado (403).
+// Novo conteúdo = texto novo na frente + mídia atual. Texto vazio remove o texto;
+// sem mídia, o post fica com conteudo = [] (permitido).
 const atualizarPost = async (req, res) => {
     try {
-        const id_post = Number(req.params.postId)
+        const id_post = lerParam(req, 'postId', 'id_post')
         const id_usuario = idDoUsuarioLogado(req)
 
         if (!idValido(id_post)) return responderErro(res, config_message.ID_POST_INVALIDO)
@@ -436,7 +415,7 @@ const atualizarPost = async (req, res) => {
 
         const texto = lerTexto(req)
 
-        if (texto === null || texto.length > TEXTO_MAX_CARACTERES) {
+        if (textoInvalido(texto)) {
             return responderErro(res, config_message.CONTEUDO_POST_INVALIDO)
         }
 
@@ -451,34 +430,40 @@ const atualizarPost = async (req, res) => {
             return responderErro(res, config_message.POST_SEM_PERMISSAO)
         }
 
-        const midias = lerConteudo(existente.conteudo).filter(i => i.tipo !== 'texto')
+        const midias = lerConteudo(existente.conteudo).filter(item => item.tipo !== 'texto')
         const conteudo = texto ? [{ tipo: 'texto', valor: texto }, ...midias] : midias
 
-        await postDAO.UpdatePost({
+        const linhasAtualizadas = await postDAO.UpdatePost({
             id: id_post,
             id_usuario,
             conteudo: JSON.stringify(conteudo)
         })
+
+        // Post removido entre a consulta e o update
+        if (!linhasAtualizadas) {
+            return responderErro(res, config_message.POST_NAO_ENCONTRADO)
+        }
 
         const atualizado = await postDAO.GetPostById(id_post)
 
         return responderSucesso(res, config_message.POST_ATUALIZADO, {
             post: formatarPost(atualizado)
         })
+
     } catch (error) {
         console.error('Erro ao atualizar post:', error)
         return responderErro(res, config_message.ERRO_ATUALIZAR_POST)
     }
 }
 
-// DELETE /posts/:postId
-// Remove o post com exclusão LÓGICA: o registro continua no banco, só muda o status para 0
-// (por isso aparece em listarPostsInativos). Os arquivos continuam no Cloudinary,
-// o que permite restaurar o post depois, mas ocupa espaço. Mesmas verificações do
-// atualizarPost: ids válidos, post existe e ativo, e pertence ao usuário logado.
+// PATCH /deletar/:postId
+// Exclusão LÓGICA: o registro continua no banco, só muda o status para 0 (por isso
+// aparece em listarPostsInativos). Os arquivos continuam no Cloudinary, o que
+// permite restaurar o post, mas ocupa espaço.
+// Mesmas verificações do atualizarPost: ids válidos, post existe e ativo, e é do usuário.
 const deletarPost = async (req, res) => {
     try {
-        const id_post = Number(req.params.postId)
+        const id_post = lerParam(req, 'postId', 'id_post')
         const id_usuario = idDoUsuarioLogado(req)
 
         if (!idValido(id_post)) return responderErro(res, config_message.ID_POST_INVALIDO)
@@ -494,9 +479,15 @@ const deletarPost = async (req, res) => {
             return responderErro(res, config_message.POST_SEM_PERMISSAO)
         }
 
-        await postDAO.DeletePost(id_post, id_usuario)
+        const linhasRemovidas = await postDAO.DeletePost(id_post, id_usuario)
+
+        // Post já removido entre a consulta e o update
+        if (!linhasRemovidas) {
+            return responderErro(res, config_message.POST_NAO_ENCONTRADO)
+        }
 
         return responderSucesso(res, config_message.POST_DELETADO)
+
     } catch (error) {
         console.error('Erro ao remover post:', error)
         return responderErro(res, config_message.ERRO_DELETAR_POST)

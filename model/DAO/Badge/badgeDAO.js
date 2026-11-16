@@ -6,12 +6,13 @@ const knexConex = knex(knexConfig.development)
 const CAMPOS_ATUALIZAVEIS = ['icone', 'nome', 'descricao', 'xp']
 
 // Convenção de retorno das funções de escrita:
-//   true / id  -> sucesso
-//   false      -> nenhum registro afetado (não encontrado)
-//   null       -> erro de banco
-//   'DUPLICADO' / 'EM_USO' -> violação de UNIQUE / FOREIGN KEY
+//   true / id               -> sucesso
+//   false                   -> nenhum registro afetado (não encontrado)
+//   null                    -> erro de banco
+//   'DUPLICADO' / 'EM_USO'  -> violação de UNIQUE / FOREIGN KEY
 
-// Criar badge
+/* ------------------------------ Create ------------------------------ */
+
 const CreateBadge = async (badge) => {
     const sql = `insert into tbl_badge
         (icone, nome, descricao, xp)
@@ -34,7 +35,47 @@ const CreateBadge = async (badge) => {
     }
 }
 
-// Atualizar badge (parcial: só os campos enviados)
+/* ------------------------------- Read ------------------------------- */
+
+const GetBadgeById = async (id) => {
+    try {
+        const [result] = await knexConex.raw('select * from tbl_badge where id = ?', [id])
+
+        return result[0] || null
+    } catch (error) {
+        console.error('Erro ao buscar badge por id:', error)
+        return null
+    }
+}
+
+const GetBadgeByNome = async (nome) => {
+    try {
+        const [result] = await knexConex.raw('select * from tbl_badge where nome = ?', [nome])
+
+        return result[0] || null
+    } catch (error) {
+        console.error('Erro ao buscar badge por nome:', error)
+        return null
+    }
+}
+
+// Retorna array ou false em erro
+const GetAllBadges = async () => {
+    try {
+        const [result] = await knexConex.raw(
+            'select id, icone, nome, descricao, xp from tbl_badge'
+        )
+
+        return result
+    } catch (error) {
+        console.error('Erro ao buscar todas as badges:', error)
+        return false
+    }
+}
+
+/* ------------------------------ Update ------------------------------ */
+
+// Atualização parcial: só os campos enviados
 const UpdateBadge = async (badge) => {
     const sets = []
     const valores = []
@@ -64,25 +105,11 @@ const UpdateBadge = async (badge) => {
     }
 }
 
-// Buscar badge pelo id
-const GetBadgeById = async (id) => {
-    try {
-        const [result] = await knexConex.raw('select * from tbl_badge where id = ?', [id])
+/* ------------------------------ Delete ------------------------------ */
 
-        return result[0] || null
-    } catch (error) {
-        console.error('Erro ao buscar badge por id:', error)
-        return null
-    }
-}
-
-// Deletar badge
 const DeleteBadge = async (badge) => {
-    const sql = `delete from tbl_badge
-        where id = ?`
-
     try {
-        const [result] = await knexConex.raw(sql, [badge.id])
+        const [result] = await knexConex.raw('delete from tbl_badge where id = ?', [badge.id])
 
         return result.affectedRows > 0
     } catch (error) {
@@ -93,45 +120,22 @@ const DeleteBadge = async (badge) => {
     }
 }
 
-// Buscar badge pelo nome
-const GetBadgeByNome = async (nome) => {
-    const sql = `select * from tbl_badge
-        where nome = ?`
+/* ---------------------------- Validações ---------------------------- */
 
-    try {
-        const [result] = await knexConex.raw(sql, [nome])
-
-        return result[0] || null
-    } catch (error) {
-        console.error('Erro ao buscar badge por nome:', error)
-        return null
-    }
-}
-
-// Buscar todas as badges
-const GetAllBadges = async () => {
-    try {
-        return await knexConex('tbl_badge').select('id', 'icone', 'nome', 'descricao', 'xp')
-    } catch (error) {
-        console.error('Erro ao buscar todas as badges:', error)
-        return false
-    }
-}
-
-// Verifica se já existe badge com o mesmo nome (true/false; null em caso de erro).
+// Verifica se já existe badge com o mesmo nome (true/false; null em erro).
 // idIgnorar: id da própria badge, usado na atualização.
 const ValidarBadge = async (badge, idIgnorar = null) => {
+    if (!badge.nome) return false
+
+    let sql = `select id from tbl_badge where nome = ?`
+    const valores = [badge.nome]
+
+    if (idIgnorar) {
+        sql += ` and id <> ?`
+        valores.push(idIgnorar)
+    }
+
     try {
-        if (!badge.nome) return false
-
-        let sql = `select id from tbl_badge where nome = ?`
-        const valores = [badge.nome]
-
-        if (idIgnorar) {
-            sql += ` and id <> ?`
-            valores.push(idIgnorar)
-        }
-
         const [result] = await knexConex.raw(sql, valores)
 
         return result.length > 0

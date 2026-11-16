@@ -3,10 +3,10 @@ const knex = require('knex')
 const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
-// Nome único da tabela de vínculo (antes havia tbl_badge_usuario e tbl_usuario_badge misturados)
+// Tabela de vínculo usuário <-> badge
 const TABELA = 'tbl_badge_usuario'
 
-// Verifica se o usuário já possui a badge (true/false; null em caso de erro)
+// Verifica se o usuário já possui a badge (true/false; null em erro)
 const UsuarioPossuiBadge = async (id_usuario, id_badge) => {
     const sql = `select 1 from ${TABELA}
         where id_usuario = ? and id_badge = ?
@@ -43,7 +43,7 @@ const PushBadgeUser = async (id_usuario, id_badge) => {
     }
 }
 
-// Lista badges do usuário (false em caso de erro)
+// Lista badges do usuário (false em erro)
 const GetBadgesByIdUsuario = async (id_usuario) => {
     const sql = `select b.id, b.icone, b.nome, b.descricao, b.xp, ub.data_conquista
         from ${TABELA} ub
