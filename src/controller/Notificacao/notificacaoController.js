@@ -1,9 +1,15 @@
+
 const config_message = require('../../controller/modulo/configMensagens.js')
+const NOTIFICACOES = require('../../controller/modulo/messageNotificacao.js')
 const NotificacaoModel = require('../../../model/DAO/notificacoes/notificacaoDAO.js')
 
-const idValido = (v) => Number.isInteger(v) && v > 0
+// ============================================================
+// CONSTANTES
+// ============================================================
 
-const TIPOS_REFERENCIA_VALIDOS = ['post', 'comentario', 'meta', 'oportunidade']
+const CONTEUDO_MAX_CARACTERES = 200
+
+const idValido = (v) => Number.isInteger(v) && v > 0
 
 const respostaErro = (res, configuracao) => {
     return res.status(configuracao.status).json({
@@ -13,67 +19,172 @@ const respostaErro = (res, configuracao) => {
     })
 }
 
-// Valida o par opcional (tipo_referencia, id_referencia) que liga a notificação
-// a uma entidade (post, meta, oportunidade...). Os dois são opcionais, mas se um
-// vier o outro também precisa vir, e de forma válida.
-const referenciaValida = (tipo_referencia, id_referencia) => {
-    if (tipo_referencia === undefined && id_referencia === undefined) {
-        return { ok: true, tipo_referencia: null, id_referencia: null }
-    }
+// ============================================================
+// CATÁLOGO DE NOTIFICAÇÕES
+// ============================================================
 
-    if (tipo_referencia === undefined || id_referencia === undefined) {
-        return { ok: false }
-    }
+const buscarMensagem = (id) =>
+    Number.isInteger(id) && Object.hasOwn(NOTIFICACOES, id)
+        ? NOTIFICACOES[id]
+        : null
 
-    if (!TIPOS_REFERENCIA_VALIDOS.includes(tipo_referencia)) {
-        return { ok: false }
-    }
+const preencher = (texto, variaveis) => {
+    const faltando = []
 
-    const id = Number(id_referencia)
+    const resultado = texto.replace(/\{(\w+)\}/g, (_, chave) => {
+        const valor = variaveis?.[chave]
 
-    if (!idValido(id)) {
-        return { ok: false }
-    }
+        if (valor === undefined || valor === null || String(valor).trim() === '') {
+            faltando.push(chave)
+            return ''
+        }
 
-    return { ok: true, tipo_referencia, id_referencia: id }
+        return String(valor).trim()
+    })
+
+    return { resultado, faltando }
 }
+
+const montarNotificacao = (id_mensagem, variaveis = {}, id_referencia) => {
+    const modelo = buscarMensagem(id_mensagem)
+
+    if (!modelo) return { ok: false, motivo: 'MENSAGEM_INVALIDA' }
+
+    let referencia = null
+
+    if (modelo.referencia) {
+        referencia = Number(id_referencia)
+
+        if (!idValido(referencia)) {
+            return { ok: false, motivo: 'REFERENCIA_OBRIGATORIA' }
+        }
+    }
+
+    const nome = preencher(modelo.nome, variaveis)
+    const conteudo = preencher(modelo.conteudo, variaveis)
+
+    if (nome.faltando.length || conteudo.faltando.length) {
+        return { ok: false, motivo: 'VARIAVEL_FALTANDO' }
+    }
+
+    if (conteudo.resultado.length > CONTEUDO_MAX_CARACTERES) {
+        return { ok: false, motivo: 'CONTEUDO_LONGO' }
+    }
+
+    return {
+        ok: true,
+        notificacao: {
+            icone: modelo.icone,
+            nome: nome.resultado,
+            conteudo: conteudo.resultado,
+            tipo_referencia: modelo.referencia,
+            id_referencia: referencia
+        }
+    }
+}
+
+// ============================================================
+// MOTIVOS DE ERRO
+// ============================================================
+
+const MOTIVOS_NOTIFICACAO = {
+    MENSAGEM_INVALIDA: 'NOTIFICACAO_MENSAGEM_INVALIDA',
+    REFERENCIA_OBRIGATORIA: 'NOTIFICACAO_REFERENCIA_OBRIGATORIA',
+    VARIAVEL_FALTANDO: 'NOTIFICACAO_VARIAVEL_FALTANDO',
+    CONTEUDO_LONGO: 'CONTEUDO_NOTIFICACAO_INVALIDO',
+    USUARIO_NAO_ENCONTRADO: 'USUARIO_NAO_ENCONTRADO',
+    ERRO: 'ERRO_CRIAR_NOTIFICACAO'
+}
+
+// ============================================================
+// ENVIAR NOTIFICAÇÃO
+// ============================================================
+
+const enviarNotificacao = async ({ id_usuario, id_mensagem, variaveis = {}, id_referencia }) => {
+    try {
+        const montada = montarNotificacao(id_mensagem, variaveis, id_referencia)
+
+        if (!montada.ok) return montada
+
+        const id = await NotificacaoModel.CreateNotification({
+            ...montada.notificacao,
+            id_usuario
+        })
+
+        if (id === 'FK_INVALIDA') {
+            return { ok: false, motivo: 'USUARIO_NAO_ENCONTRADO' }
+        }
+
+        if (!id) return { ok: false, motivo: 'ERRO' }
+
+        return { ok: true, id }
+    } catch (error) {
+        console.error('Erro ao enviar notificação:', error)
+        return { ok: false, motivo: 'ERRO' }
+    }
+}
+
+// ============================================================
+// LISTAR MENSAGENS
+// ============================================================
+
+const listarMensagens = async (req, res) => {
+    const mensagens = Object.entries(NOTIFICACOES).map(([id, m]) => ({
+        id: Number(id),
+        categoria: m.categoria,
+        icone: m.icone,
+        nome: m.nome,
+        conteudo: m.conteudo,
+        referencia: m.referencia,
+        variaveis: [...new Set(
+            [...(m.nome + m.conteudo).matchAll(/\{(\w+)\}/g)].map(x => x[1])
+        )]
+    }))
+
+    const mensagem = config_message.OK
+
+    return res.status(mensagem.status).json({
+        sucesso: true,
+        mensagem: mensagem.mensagem,
+        quantidade: mensagens.length,
+        mensagens
+    })
+}
+
+// ============================================================
+// CRIAR NOTIFICAÇÃO
+// ============================================================
 
 const criarNotificacao = async (req, res) => {
     try {
         const body = req.body || {}
         const id_usuario = Number(body.id_usuario)
+        const id_mensagem = Number(body.id_mensagem)
 
         if (!idValido(id_usuario)) {
             return respostaErro(res, config_message.ID_INVALIDO)
         }
 
-        const { icone, nome, conteudo, tipo_referencia, id_referencia } = body
-
-        if ([icone, nome, conteudo].some(v => typeof v !== 'string' || !v.trim())) {
-            return respostaErro(res, config_message.PARAMETRO_INVALIDO)
+        if (!idValido(id_mensagem)) {
+            return respostaErro(res, config_message.NOTIFICACAO_MENSAGEM_INVALIDA)
         }
 
-        const referencia = referenciaValida(tipo_referencia, id_referencia)
+        const variaveis = body.variaveis && typeof body.variaveis === 'object'
+            ? body.variaveis
+            : {}
 
-        if (!referencia.ok) {
-            return respostaErro(res, config_message.PARAMETRO_INVALIDO)
-        }
-
-        const id_notificacao = await NotificacaoModel.CreateNotificacao({
-            icone: icone.trim(),
-            nome: nome.trim(),
-            conteudo: conteudo.trim(),
+        const resultado = await enviarNotificacao({
             id_usuario,
-            tipo_referencia: referencia.tipo_referencia,
-            id_referencia: referencia.id_referencia
+            id_mensagem,
+            variaveis,
+            id_referencia: body.id_referencia
         })
 
-        if (id_notificacao === 'FK_INVALIDA') {
-            return respostaErro(res, config_message.USUARIO_NAO_ENCONTRADO)
-        }
-
-        if (!id_notificacao) {
-            return respostaErro(res, config_message.ERRO_CRIAR_NOTIFICACAO)
+        if (!resultado.ok) {
+            return respostaErro(
+                res,
+                config_message[MOTIVOS_NOTIFICACAO[resultado.motivo]]
+            )
         }
 
         const mensagem = config_message.NOTIFICACAO_CRIADA
@@ -81,14 +192,17 @@ const criarNotificacao = async (req, res) => {
         return res.status(mensagem.status).json({
             sucesso: true,
             mensagem: mensagem.mensagem,
-            id_notificacao
+            id_notificacao: resultado.id
         })
-
     } catch (error) {
         console.error('Erro ao criar notificação:', error)
         return respostaErro(res, config_message.ERRO_CRIAR_NOTIFICACAO)
     }
 }
+
+// ============================================================
+// BUSCAR NOTIFICAÇÕES DO USUÁRIO
+// ============================================================
 
 const buscarNotificacoesUsuario = async (req, res) => {
     try {
@@ -108,7 +222,10 @@ const buscarNotificacoesUsuario = async (req, res) => {
             lida = Number(req.query.lida)
         }
 
-        const notificacoes = await NotificacaoModel.GetNotificacoesByUsuario(id_usuario, { lida })
+        const notificacoes = await NotificacaoModel.GetNotificationsByUser(
+            id_usuario,
+            { lida }
+        )
 
         if (notificacoes === false) {
             return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
@@ -122,12 +239,15 @@ const buscarNotificacoesUsuario = async (req, res) => {
             quantidade: notificacoes.length,
             notificacoes
         })
-
     } catch (error) {
         console.error('Erro ao buscar notificações do usuário:', error)
         return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
     }
 }
+
+// ============================================================
+// BUSCAR NOTIFICAÇÃO POR ID
+// ============================================================
 
 const buscarNotificacaoPorId = async (req, res) => {
     try {
@@ -137,7 +257,7 @@ const buscarNotificacaoPorId = async (req, res) => {
             return respostaErro(res, config_message.ID_NOTIFICACAO_INVALIDO)
         }
 
-        const notificacao = await NotificacaoModel.GetNotificacaoById(id_notificacao)
+        const notificacao = await NotificacaoModel.GetNotificationById(id_notificacao)
 
         if (!notificacao) {
             return respostaErro(res, config_message.NOTIFICACAO_NAO_ENCONTRADA)
@@ -150,12 +270,15 @@ const buscarNotificacaoPorId = async (req, res) => {
             mensagem: mensagem.mensagem,
             notificacao
         })
-
     } catch (error) {
         console.error('Erro ao buscar notificação:', error)
         return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
     }
 }
+
+// ============================================================
+// MARCAR NOTIFICAÇÃO COMO LIDA
+// ============================================================
 
 const marcarComoLida = async (req, res) => {
     try {
@@ -165,7 +288,7 @@ const marcarComoLida = async (req, res) => {
             return respostaErro(res, config_message.ID_NOTIFICACAO_INVALIDO)
         }
 
-        const notificacao = await NotificacaoModel.GetNotificacaoById(id_notificacao)
+        const notificacao = await NotificacaoModel.GetNotificationById(id_notificacao)
 
         if (!notificacao) {
             return respostaErro(res, config_message.NOTIFICACAO_NAO_ENCONTRADA)
@@ -175,7 +298,10 @@ const marcarComoLida = async (req, res) => {
             return respostaErro(res, config_message.NOTIFICACAO_JA_LIDA)
         }
 
-        const resultado = await NotificacaoModel.MarcarComoLida(id_notificacao)
+        const resultado = await NotificacaoModel.MarkAsRead(
+            id_notificacao,
+            notificacao.id_usuario
+        )
 
         if (resultado === null) {
             return respostaErro(res, config_message.ERRO_ATUALIZAR_NOTIFICACAO)
@@ -191,12 +317,15 @@ const marcarComoLida = async (req, res) => {
             sucesso: true,
             mensagem: mensagem.mensagem
         })
-
     } catch (error) {
         console.error('Erro ao marcar notificação como lida:', error)
         return respostaErro(res, config_message.ERRO_ATUALIZAR_NOTIFICACAO)
     }
 }
+
+// ============================================================
+// MARCAR TODAS AS NOTIFICAÇÕES COMO LIDAS
+// ============================================================
 
 const marcarTodasComoLidas = async (req, res) => {
     try {
@@ -206,7 +335,7 @@ const marcarTodasComoLidas = async (req, res) => {
             return respostaErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const atualizadas = await NotificacaoModel.MarcarTodasComoLidas(id_usuario)
+        const atualizadas = await NotificacaoModel.MarkAllAsRead(id_usuario)
 
         if (atualizadas === null) {
             return respostaErro(res, config_message.ERRO_ATUALIZAR_NOTIFICACAO)
@@ -219,12 +348,15 @@ const marcarTodasComoLidas = async (req, res) => {
             mensagem: mensagem.mensagem,
             quantidade: atualizadas
         })
-
     } catch (error) {
         console.error('Erro ao marcar todas as notificações como lidas:', error)
         return respostaErro(res, config_message.ERRO_ATUALIZAR_NOTIFICACAO)
     }
 }
+
+// ============================================================
+// DELETAR NOTIFICAÇÃO
+// ============================================================
 
 const deletarNotificacao = async (req, res) => {
     try {
@@ -234,7 +366,16 @@ const deletarNotificacao = async (req, res) => {
             return respostaErro(res, config_message.ID_NOTIFICACAO_INVALIDO)
         }
 
-        const resultado = await NotificacaoModel.DeleteNotificacao(id_notificacao)
+        const notificacao = await NotificacaoModel.GetNotificationById(id_notificacao)
+
+        if (!notificacao) {
+            return respostaErro(res, config_message.NOTIFICACAO_NAO_ENCONTRADA)
+        }
+
+        const resultado = await NotificacaoModel.DeleteNotification(
+            id_notificacao,
+            notificacao.id_usuario
+        )
 
         if (resultado === null) {
             return respostaErro(res, config_message.ERRO_DELETAR_NOTIFICACAO)
@@ -250,12 +391,12 @@ const deletarNotificacao = async (req, res) => {
             sucesso: true,
             mensagem: mensagem.mensagem
         })
-
     } catch (error) {
         console.error('Erro ao deletar notificação:', error)
         return respostaErro(res, config_message.ERRO_DELETAR_NOTIFICACAO)
     }
 }
+
 
 const buscarTodasNaolidas = async (req, res) => {
     try {
@@ -265,9 +406,9 @@ const buscarTodasNaolidas = async (req, res) => {
             return respostaErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const quantidade = await NotificacaoModel.ContarNaoLidas(id_usuario)
+        const resultado = await NotificacaoModel.GetUnreadNotifications(id_usuario)
 
-        if (quantidade === null) {
+        if (!resultado) {
             return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
         }
 
@@ -276,7 +417,8 @@ const buscarTodasNaolidas = async (req, res) => {
         return res.status(mensagem.status).json({
             sucesso: true,
             mensagem: mensagem.mensagem,
-            quantidade
+            quantidade: resultado.quantidade,
+            notificacoes: resultado.notificacoes
         })
 
     } catch (error) {
@@ -284,6 +426,7 @@ const buscarTodasNaolidas = async (req, res) => {
         return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
     }
 }
+
 
 const buscarTodaslidas = async (req, res) => {
     try {
@@ -293,9 +436,9 @@ const buscarTodaslidas = async (req, res) => {
             return respostaErro(res, config_message.ID_USUARIO_INVALIDO)
         }
 
-        const quantidade = await NotificacaoModel.ContarLidas(id_usuario)
+        const resultado = await NotificacaoModel.GetReadNotifications(id_usuario)
 
-        if (quantidade === null) {
+        if (!resultado) {
             return respostaErro(res, config_message.ERRO_BUSCAR_NOTIFICACOES)
         }
 
@@ -304,7 +447,8 @@ const buscarTodaslidas = async (req, res) => {
         return res.status(mensagem.status).json({
             sucesso: true,
             mensagem: mensagem.mensagem,
-            quantidade
+            quantidade: resultado.quantidade,
+            notificacoes: resultado.notificacoes
         })
 
     } catch (error) {
@@ -313,8 +457,14 @@ const buscarTodaslidas = async (req, res) => {
     }
 }
 
+// ============================================================
+// EXPORTAÇÕES
+// ============================================================
+
 module.exports = {
+    listarMensagens,
     criarNotificacao,
+    enviarNotificacao,
     buscarNotificacoesUsuario,
     buscarTodasNaolidas,
     buscarTodaslidas,
