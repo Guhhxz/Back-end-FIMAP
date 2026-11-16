@@ -474,3 +474,30 @@ CREATE TABLE IF NOT EXISTS tbl_denuncia (
     
     UNIQUE(id_usuario, id_post)
 );
+
+
+ALTER TABLE tbl_meta_financeira
+    ADD COLUMN aporte_mensal DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER valor_total,
+    ADD COLUMN id_conta_vinculada INT NULL AFTER id_categoria;
+
+ALTER TABLE tbl_meta_financeira
+    ADD CONSTRAINT FK_CONEXAO_META
+    FOREIGN KEY (id_conta_vinculada)
+    REFERENCES tbl_conexao_open_finance (id)
+    ON DELETE SET NULL;
+    
+ALTER TABLE tbl_categoria_meta
+    ADD COLUMN id_usuario INT NULL AFTER nome;
+    
+
+ALTER TABLE tbl_categoria_meta
+    ADD CONSTRAINT FK_USUARIO_CATEGORIAMETA
+    FOREIGN KEY (id_usuario)
+    REFERENCES tbl_usuario (id)
+    ON DELETE CASCADE;
+    
+SELECT * from tbl_conexao_open_finance;
+SELECT * from tbl_meta_financeira;
+    
+ALTER TABLE tbl_conexao_open_finance
+	ADD COLUMN nome_instituicao VARCHAR(100) NULL AFTER external_connection_id;

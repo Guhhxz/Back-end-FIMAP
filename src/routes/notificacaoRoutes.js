@@ -9,6 +9,7 @@ router.get('/usuarios/:id_usuario/notificacoes', notificacaoController.buscarNot
 router.get('/notificacoes/:id_notificacao', notificacaoController.buscarNotificacaoPorId)
 router.get('/usuarios/:id_usuario/notificacoes/nao-lidas', notificacaoController.buscarTodasNaolidas)
 router.get('/usuarios/:id_usuario/notificacoes/lidas', notificacaoController.buscarTodaslidas)
+router.get('/notificacoes/:id_notificacao', notificacaoController.buscarNotificacaoPorId)
 
 
 router.patch('/usuarios/:id_usuario/notificacoes/lidas', notificacaoController.marcarTodasComoLidas)
