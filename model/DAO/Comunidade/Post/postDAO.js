@@ -1,6 +1,6 @@
 const knex = require('knex')
 
-const knexConfig = require('../../Database_config_knex/KnexFile.js')
+const knexConfig = require('../../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
 const STATUS_ATIVO = 1
@@ -125,7 +125,7 @@ const UpdatePost = async (post) => {
 
 // Exclusão lógica: muda o status para removido. Retorna as linhas afetadas
 const DeletePost = async (postId, idUsuario) => {
-    const sql = `update tbl_post
+    const sql = `update tbl_posts
         set status = ?
         where id = ? and id_usuario = ? and status = ?`
 

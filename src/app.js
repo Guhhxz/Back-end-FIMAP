@@ -14,7 +14,7 @@ const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
 const chatRoutes = require('./routes/chatRoutes.js')
-const postRoutes = require('./routes/postRoutes.js')
+const comunidadeRoutes = require('./routes/comunidadeRoutes.js')
 const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
 const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
 // const sessaoRoutes = require('./routes/sessaoRoutes.js') // importada mas nunca montada
@@ -53,7 +53,7 @@ app.use('/v1/configuracoes', configuracoesRoutes)
 app.use('/v1/badge', badgeRoutes)
 app.use('/v1', simulacoesRoutes)
 app.use('/v1/notificacoes', notificacaoRoutes)
-app.use('/v1/comunidade/posts', postRoutes)
+app.use('/v1/comunidade/posts', comunidadeRoutes)
 
 /* ----------------------------- Servidor ----------------------------- */
 
