@@ -56,6 +56,7 @@ app.use('/v1/simulacao', simulacoesRoutes)
 app.use('/v1/notificacoes', notificacaoRoutes)
 app.use('/v1/comunidade/posts', comunidadeRoutes)
 app.use('/v1/comunidade/posts/comentario', comunidadeRoutes)
+app.use('/v1/comunidade/curtida', comunidadeRoutes)
 
 /* ----------------------------- Servidor ----------------------------- */
 

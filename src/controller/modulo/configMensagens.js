@@ -15,6 +15,11 @@ const config_message = {
         mensagem: 'Operação realizada com sucesso, sem conteúdo para retornar.'
     },
 
+    CURTIDA_CRIADA: {
+        status: 201,
+        mensagem: 'curtido com sucesso'
+    },
+
 
     // ==========================================
     // ERROS DO CLIENTE - 4XX
@@ -1965,6 +1970,73 @@ const config_message = {
         status: 500,
         mensagem: 'Não foi possível remover o badge do usuário.'
     },
+    // ==========================================
+    // CURTIDA EM POST (tbl_curtida_post)
+    // ==========================================
+    CURTIDA_POST_CRIADA: {
+        status: 201,
+        mensagem: 'Publicação curtida com sucesso.'
+    },
+    CURTIDAS_POST_ENCONTRADAS: {
+        status: 200,
+        mensagem: 'Curtidas da publicação consultadas com sucesso.'
+    },
+    CURTIDA_POST_REMOVIDA: {
+        status: 200,
+        mensagem: 'Curtida removida da publicação com sucesso.'
+    },
+    CURTIDA_POST_EXISTENTE: {
+        status: 409,
+        mensagem: 'Você já curtiu esta publicação.'
+    },
+    CURTIDA_POST_NAO_ENCONTRADA: {
+        status: 404,
+        mensagem: 'Você ainda não curtiu esta publicação.'
+    },
+
+    // Compatibilidade com o controller de curtidas
+    CURTIDA_NAO_ENCONTRADA: {
+        status: 404,
+        mensagem: 'Você ainda não curtiu esta publicação.'
+    },
+    CURTIDA_REMOVIDA: {
+        status: 200,
+        mensagem: 'Curtida removida da publicação com sucesso.'
+    },
+    CURTIDAS_ENCONTRADAS: {
+        status: 200,
+        mensagem: 'Curtidas consultadas com sucesso.'
+    },
+    CURTIDA_JA_EXISTE: {
+        status: 409,
+        mensagem: 'Você já curtiu esta publicação.'
+    },
+
+    ERRO_CURTIR_POST: {
+        status: 500,
+        mensagem: 'Não foi possível curtir a publicação.'
+    },
+    ERRO_CURTIR: {
+        status: 500,
+        mensagem: 'Não foi possível curtir a publicação.'
+    },
+    ERRO_DESCURTIR: {
+        status: 500,
+        mensagem: 'Não foi possível remover a curtida da publicação.'
+    },
+    ERRO_BUSCAR_CURTIDAS_POST: {
+        status: 500,
+        mensagem: 'Não foi possível consultar as curtidas da publicação.'
+    },
+    ERRO_BUSCAR_CURTIDAS: {
+        status: 500,
+        mensagem: 'Não foi possível consultar as curtidas da publicação.'
+    },
+    ERRO_REMOVER_CURTIDA_POST: {
+        status: 500,
+        mensagem: 'Não foi possível remover a curtida da publicação.'
+    },
+
 
     // ==========================================
     // RANKING / XP (tbl_ranking)
