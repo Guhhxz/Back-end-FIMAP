@@ -1,75 +1,187 @@
 const knex = require('knex')
 
-const knexConfig = require('../../../Database_config_knex/KnexFile.js')
+const knexConfig = require('../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
+// Convenção deste arquivo: erros de banco são relançados (throw);
+// quem trata é o controller.
+
+/* ------------------------------ Create ------------------------------ */
+
+// Cria um comentário (raiz ou resposta). Retorna o id criado.
+// Se id_comentario_pai for informado, o comentário é uma resposta
 const CreateComentario = async (comentario) => {
     const sql = `insert into tbl_comentario
         (mensagem, data_criacao, id_usuario, id_post, id_comentario_pai)
         values (?, now(), ?, ?, ?)`
 
-    const result = await knexConex.raw(sql, [
-        comentario.mensagem,
-        comentario.id_usuario,
-        comentario.id_post,
-        comentario.id_comentario_pai
-    ])
-
-    return result
-};
-
-const DeleteComentario = async (idComentario) => {
-    const sql = `delete from tbl_comentario where id = ?`
-
     try {
-        const result = await knexConex.raw(sql, [idComentario])
-        return result
+        const [result] = await knexConex.raw(sql, [
+            comentario.mensagem,
+            comentario.id_usuario,
+            comentario.id_post,
+            comentario.id_comentario_pai ?? null
+        ])
+
+        return result.insertId
     } catch (error) {
-        console.error('Erro ao deletar comentário:', error)
-        throw error
-    } 
-};
+        // Usuário, post ou comentário pai inexistente é tratado pelo controller
+        // (validação), sem log de erro
+        if (error.code !== 'ER_NO_REFERENCED_ROW_2') {
+            console.error('Erro ao criar comentário:', error)
+        }
 
-const UpdateComentario = async (idComentario, novaMensagem) => {
-    const sql = `update tbl_comentario set mensagem = ?, data_atualizacao = now() where id = ?`
+        throw error
+    }
+}
+
+/* ------------------------------- Read ------------------------------- */
+
+// Retorna o comentário ou null
+const GetComentarioById = async (comentarioId) => {
+    try {
+        const [rows] = await knexConex.raw(
+            'select * from tbl_comentario where id = ?',
+            [comentarioId]
+        )
+
+        return rows[0] ?? null
+    } catch (error) {
+        console.error('Erro ao buscar comentário:', error)
+        throw error
+    }
+}
+
+// Todos os comentários de um post (raiz + respostas), do mais antigo ao mais novo.
+// Usa o índice IDX_COMENTARIO_POST_DATA
+const GetAllComentariosByIdPost = async (idPost) => {
+    const sql = `select * from tbl_comentario
+        where id_post = ?
+        order by data_criacao asc`
 
     try {
-        const result = await knexConex.raw(sql, [novaMensagem, idComentario])
-        return result
+        const [rows] = await knexConex.raw(sql, [idPost])
+
+        return rows
+    } catch (error) {
+        console.error('Erro ao buscar comentários do post:', error)
+        throw error
+    }
+}
+
+// Somente os comentários raiz de um post (sem pai)
+const GetComentariosRaizByIdPost = async (idPost) => {
+    const sql = `select * from tbl_comentario
+        where id_post = ? and id_comentario_pai is null
+        order by data_criacao asc`
+
+    try {
+        const [rows] = await knexConex.raw(sql, [idPost])
+
+        return rows
+    } catch (error) {
+        console.error('Erro ao buscar comentários raiz do post:', error)
+        throw error
+    }
+}
+
+// Respostas diretas de um comentário
+const GetRespostasByIdComentarioPai = async (idComentarioPai) => {
+    const sql = `select * from tbl_comentario
+        where id_comentario_pai = ?
+        order by data_criacao asc`
+
+    try {
+        const [rows] = await knexConex.raw(sql, [idComentarioPai])
+
+        return rows
+    } catch (error) {
+        console.error('Erro ao buscar respostas do comentário:', error)
+        throw error
+    }
+}
+
+// Todos os comentários feitos por um usuário
+const GetAllComentariosByIdUsuario = async (idUsuario) => {
+    const sql = `select * from tbl_comentario
+        where id_usuario = ?
+        order by data_criacao desc`
+
+    try {
+        const [rows] = await knexConex.raw(sql, [idUsuario])
+
+        return rows
+    } catch (error) {
+        console.error('Erro ao buscar comentários do usuário:', error)
+        throw error
+    }
+}
+
+// Quantidade de comentários de um post (raiz + respostas)
+const CountComentariosByIdPost = async (idPost) => {
+    try {
+        const [rows] = await knexConex.raw(
+            'select count(*) as total from tbl_comentario where id_post = ?',
+            [idPost]
+        )
+
+        return Number(rows[0].total)
+    } catch (error) {
+        console.error('Erro ao contar comentários do post:', error)
+        throw error
+    }
+}
+
+/* ------------------------------ Update ------------------------------ */
+
+// Atualiza a mensagem de um comentário do usuário. Retorna as linhas afetadas.
+// Obs.: a tabela não tem data_atualizacao, então só a mensagem é alterada
+const UpdateComentario = async (comentario) => {
+    const sql = `update tbl_comentario
+        set mensagem = ?
+        where id = ? and id_usuario = ?`
+
+    try {
+        const [result] = await knexConex.raw(sql, [
+            comentario.mensagem,
+            comentario.id,
+            comentario.id_usuario
+        ])
+
+        return result.affectedRows
     } catch (error) {
         console.error('Erro ao atualizar comentário:', error)
         throw error
     }
-};
+}
 
-const GetComentariosByPostId = async (idPost) => {
-    const sql = `select * from tbl_comentario where id_post = ?`
+/* ------------------------------ Delete ------------------------------ */
 
-    try {
-        const [rows] = await knexConex.raw(sql, [idPost])
-        return rows
-    } catch (error) {
-        console.error('Erro ao buscar comentários por post:', error)
-        throw error
-    }
-};
-
-const GetComentariosByUsuarioId = async (idUsuario) => {
-    const sql = `select * from tbl_comentario where id_usuario = ?`
+// Exclusão física (a tabela não tem status). Por causa do ON DELETE CASCADE,
+// as respostas e as curtidas do comentário também são removidas.
+// Retorna as linhas afetadas
+const DeleteComentario = async (comentarioId, idUsuario) => {
+    const sql = `delete from tbl_comentario
+        where id = ? and id_usuario = ?`
 
     try {
-        const [rows] = await knexConex.raw(sql, [idUsuario])
-        return rows
+        const [result] = await knexConex.raw(sql, [comentarioId, idUsuario])
+
+        return result.affectedRows
     } catch (error) {
-        console.error('Erro ao buscar comentários por usuário:', error)
+        console.error('Erro ao deletar comentário:', error)
         throw error
     }
-};
+}
 
 module.exports = {
     CreateComentario,
-    DeleteComentario,
     UpdateComentario,
-    GetComentariosByPostId,
-    GetComentariosByUsuarioId
+    DeleteComentario,
+    GetComentarioById,
+    GetAllComentariosByIdPost,
+    GetComentariosRaizByIdPost,
+    GetRespostasByIdComentarioPai,
+    GetAllComentariosByIdUsuario,
+    CountComentariosByIdPost
 }
