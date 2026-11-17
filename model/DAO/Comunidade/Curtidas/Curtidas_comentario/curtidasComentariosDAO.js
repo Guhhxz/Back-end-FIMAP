@@ -1,28 +1,31 @@
+
 const knex = require('knex')
 
 const knexConfig = require('../../../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
-// Convenção deste arquivo: erros de banco são relançados (throw);
-// quem trata é o controller.
+// Erros de banco são relançados para serem tratados pelo controller.
 
-/* ------------------------------ Create ------------------------------ */
+/* ============================ CREATE ============================ */
 
-// Registra a curtida de um usuário em um comentário. Retorna o id criado.
-// UNIQUE(id_usuario, id_comentario): curtir duas vezes lança ER_DUP_ENTRY.
+// Registra uma curtida em um comentário.
 const CreateCurtidaComentario = async (curtida) => {
     const sql = `insert into tbl_curtida_comentario
         (data_curtida, id_usuario, id_comentario)
         values (now(), ?, ?)`
 
     try {
-        const [result] = await knexConex.raw(sql, [curtida.id_usuario, curtida.id_comentario])
+        const [result] = await knexConex.raw(sql, [
+            curtida.id_usuario,
+            curtida.id_comentario
+        ])
 
         return result.insertId
     } catch (error) {
-        // Duplicada ou usuário/comentário inexistente é tratado pelo controller
-        // (validação), sem log de erro
-        if (error.code !== 'ER_DUP_ENTRY' && error.code !== 'ER_NO_REFERENCED_ROW_2') {
+        if (
+            error.code !== 'ER_DUP_ENTRY' &&
+            error.code !== 'ER_NO_REFERENCED_ROW_2'
+        ) {
             console.error('Erro ao curtir comentário:', error)
         }
 
@@ -30,13 +33,14 @@ const CreateCurtidaComentario = async (curtida) => {
     }
 }
 
-/* ------------------------------- Read ------------------------------- */
+/* ============================= READ ============================= */
 
-// Retorna a curtida do usuário naquele comentário, ou null se ele não curtiu
+// Busca a curtida de um usuário em um comentário.
 const GetCurtidaComentario = async (idUsuario, idComentario) => {
     try {
         const [rows] = await knexConex.raw(
-            'select * from tbl_curtida_comentario where id_usuario = ? and id_comentario = ?',
+            `select * from tbl_curtida_comentario
+             where id_usuario = ? and id_comentario = ?`,
             [idUsuario, idComentario]
         )
 
@@ -47,28 +51,24 @@ const GetCurtidaComentario = async (idUsuario, idComentario) => {
     }
 }
 
-// Todas as curtidas de um comentário (mais recentes primeiro).
-// Cada linha traz "total" (quantidade de curtidas do comentário). Com lista
-// vazia não vem nenhuma linha, então o total é 0
+// Lista todas as curtidas de um comentário.
 const GetAllCurtidasByIdComentario = async (idComentario) => {
     try {
         const [rows] = await knexConex.raw(
-            `select c.*,
-                (select count(*) from tbl_curtida_comentario where id_comentario = ?) as total
-             from tbl_curtida_comentario c
-             where c.id_comentario = ?
-             order by c.data_curtida desc`,
-            [idComentario, idComentario]
+            `select * from tbl_curtida_comentario
+             where id_comentario = ?
+             order by data_curtida desc`,
+            [idComentario]
         )
 
         return rows
     } catch (error) {
-        console.error('Erro ao buscar curtidas do comentário:', error)
+        console.error('Erro ao listar curtidas do comentário:', error)
         throw error
     }
 }
 
-// Todas as curtidas feitas por um usuário em comentários (mais recentes primeiro)
+// Lista todas as curtidas feitas por um usuário em comentários.
 const GetAllCurtidasComentarioByIdUsuario = async (idUsuario) => {
     try {
         const [rows] = await knexConex.raw(
@@ -80,19 +80,36 @@ const GetAllCurtidasComentarioByIdUsuario = async (idUsuario) => {
 
         return rows
     } catch (error) {
-        console.error('Erro ao buscar curtidas do usuário:', error)
+        console.error('Erro ao listar curtidas do usuário:', error)
         throw error
     }
 }
 
-/* ------------------------------ Delete ------------------------------ */
+// Conta o total de curtidas de um comentário.
+const CountCurtidasByIdComentario = async (idComentario) => {
+    try {
+        const [rows] = await knexConex.raw(
+            `select count(*) as total
+             from tbl_curtida_comentario
+             where id_comentario = ?`,
+            [idComentario]
+        )
 
-// Remove a curtida (descurtir). Exclusão física. Retorna as linhas afetadas
-// (0 = o usuário não tinha curtido)
+        return Number(rows[0].total)
+    } catch (error) {
+        console.error('Erro ao contar curtidas do comentário:', error)
+        throw error
+    }
+}
+
+/* ============================ DELETE ============================ */
+
+// Remove a curtida de um comentário.
 const DeleteCurtidaComentario = async (idUsuario, idComentario) => {
     try {
         const [result] = await knexConex.raw(
-            'delete from tbl_curtida_comentario where id_usuario = ? and id_comentario = ?',
+            `delete from tbl_curtida_comentario
+             where id_usuario = ? and id_comentario = ?`,
             [idUsuario, idComentario]
         )
 
@@ -108,5 +125,6 @@ module.exports = {
     GetCurtidaComentario,
     GetAllCurtidasByIdComentario,
     GetAllCurtidasComentarioByIdUsuario,
+    CountCurtidasByIdComentario,
     DeleteCurtidaComentario
 }
