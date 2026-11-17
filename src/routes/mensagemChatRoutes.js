@@ -6,11 +6,11 @@
 
 const express = require('express')
 const controller = require('../controller/MensagemChat/MensagemChatController.js')
-const limitarChat = require('../middlewares/limitarChat.js')
 const router = express.Router()
+router.use(require('../middlewares/autorization.js'))
 
 // GET apenas consulta; POST gera uma resposta e passa pelo limite de uso.
 router.get('/:chatId/mensagens', controller.listarMensagensChat)
-router.post('/:chatId/mensagens', limitarChat, controller.enviarMensagemChat)
+router.post('/:chatId/mensagens', controller.enviarMensagemChat)
 
 module.exports = router

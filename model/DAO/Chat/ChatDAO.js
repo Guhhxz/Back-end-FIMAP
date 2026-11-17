@@ -13,8 +13,8 @@ const insertChat = async (nome, id_usuario) => {
 }
 
 // O id também é retornado para os controllers conseguirem referenciar o chat.
-const GetChatById = async (id_chat) => {
-    const [rows] = await db.raw('select id, nome, data_criacao, id_usuario from tbl_chat where id = ?;', [id_chat])
+const GetChatById = async (id_chat, id_usuario) => {
+    const [rows] = await db.raw('select id, nome, data_criacao, id_usuario from tbl_chat where id = ? and id_usuario = ?;', [id_chat, id_usuario])
     return rows[0] || null
 }
 
@@ -31,18 +31,12 @@ const apagarChat = async (id_chat, id_usuario) => {
     return result.affectedRows > 0
 }
 
-const UpdateChatName = async (id_chat, novo_nome) => {
-    const [result] = await db.raw('update tbl_chat set nome = ? where id = ?;', [novo_nome, id_chat])
+const UpdateChatName = async (id_chat, novo_nome, id_usuario) => {
+    const [result] = await db.raw('update tbl_chat set nome = ? where id = ? and id_usuario = ?;', [novo_nome, id_chat, id_usuario])
     return result.affectedRows > 0
 }
 
-const GetAllChats = async () => {
-    const [rows] = await db.raw('select id, nome, data_criacao, id_usuario from tbl_chat;')
-    return rows
-}
-
 module.exports = {
-    GetAllChats,
     insertChat,
     inssertChat: insertChat, // Compatibilidade com chamadas existentes.
     GetChatById,

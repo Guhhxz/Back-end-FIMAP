@@ -8,13 +8,19 @@ const express = require("express");
 const router = express.Router();
 
 const ChatController = require("../controller/Chat/ChatController.js")
+const mensagens = require('../controller/MensagemChat/MensagemChatController.js')
+router.use(require('../middlewares/autorization.js'))
 
 
 router.post("/iniciar-chat", ChatController.CriarChat);
 
 router.get("/listar-chats/:id_usuario", ChatController.ListarChatsPorUsuario);
 router.get("/listar-chat/:id_chat", ChatController.ListaPorId);
-router.get("/listar-chats", ChatController.ListarTodosChats);
+router.get("/listar-chats", ChatController.ListarChatsPorUsuario);
+router.get('/listar-chat/:id_chat/mensagens', mensagens.listarMensagensChat);
+router.post('/mensagens', mensagens.enviarMensagemChat);
+router.get('/requisicoes/:requisicaoId', mensagens.consultarRequisicao);
+router.post('/requisicoes/:requisicaoId/cancelar', mensagens.cancelarRequisicao);
 
 router.delete("/apagar-chat/:id_chat", ChatController.ApagarChat);
 

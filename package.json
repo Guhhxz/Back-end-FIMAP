@@ -25,9 +25,10 @@
     "start": "node src/app.js",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "db:migrate": "knex --knexfile model/Database_config_knex/KnexFile.js migrate:latest"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   }
 }

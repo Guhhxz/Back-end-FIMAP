@@ -32,4 +32,10 @@ const validarMensagens = (entrada) => {
     return mensagens
 }
 
-module.exports = { criarErro, validarId, validarMensagens }
+const validarRequisicaoId = (valor) => {
+    if (typeof valor !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(valor))
+        throw criarErro(400, 'requisicao_id deve ser um UUID válido.', 'REQUISICAO_ID_INVALIDO')
+    return valor.toLowerCase()
+}
+
+module.exports = { criarErro, validarId, validarMensagens, validarRequisicaoId }

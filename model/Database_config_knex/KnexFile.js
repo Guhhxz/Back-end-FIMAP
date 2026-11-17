@@ -18,7 +18,7 @@ module.exports = {
       // Configurações de Migração
       migrations: {
         tableName: 'knex_migrations', // Nome da tabela de migrações
-        directory: './db/migrations'
+        directory: require('path').resolve(__dirname, '../../db/migrations')
       },
       seeds: {
         directory: './db/seeds'

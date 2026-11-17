@@ -36,7 +36,8 @@ const app = express()
 const corsOption = {
     origin: "*",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Retry-After", "X-Requisicao-Id"]
 }
 
 app.use(cors(corsOption))
@@ -67,7 +68,7 @@ app.use((error, req, res, next) => {
     const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : 500
     const mensagem = status === 413 ? 'O corpo da requisição excedeu o limite permitido.'
         : status === 400 ? 'O corpo precisa ser um JSON válido.' : 'Erro interno do servidor.'
-    return res.status(status).json({ sucesso: false, mensagem })
+    return res.status(status).json({ sucesso: false, codigo: status === 500 ? 'ERRO_INTERNO' : 'REQUISICAO_INVALIDA', mensagem })
 })
 
 if (require.main === module) {

@@ -11,5 +11,5 @@ module.exports = rateLimit({
     limit: 12,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: { sucesso: false, mensagem: 'Limite de perguntas atingido. Tente novamente em um minuto.' }
+    message: { sucesso: false, codigo: 'CHAT_LIMITE_IP', mensagem: 'Limite de perguntas atingido. Tente novamente em um minuto.' }
 })

@@ -5,10 +5,11 @@
  */
 
 const { criarErro, validarMensagens } = require('./chatValidation.js')
+const { erroWorker } = require('./chatErrors.js')
 
 // O prompt e o modelo são administrados no Worker. O cliente envia apenas o histórico.
 const WORKER_URL_PADRAO = 'https://back-end-fimap.pedroday813.workers.dev/v1/ia/chat-publico'
-const TIMEOUT_IA_MS = 180000
+const TIMEOUT_IA_MS = 120000
 
 // Lê URL e token antes da chamada; o token fica apenas no backend.
 const obterConfiguracao = () => {
@@ -18,9 +19,15 @@ const obterConfiguracao = () => {
     if (!['https:', 'http:'].includes(url.protocol))
         throw criarErro(503, 'A URL da IA precisa usar HTTP ou HTTPS.', 'IA_CONFIGURACAO')
     const token = process.env.CLOUDFLARE_CHAT_TOKEN
-    if (url.pathname.replace(/\/$/, '') === '/chat' && !token)
+    if (['/chat', '/v1/ia/chat'].includes(url.pathname.replace(/\/$/, '')) && !token)
         throw criarErro(503, 'Configure CLOUDFLARE_CHAT_TOKEN para usar a rota protegida /chat.', 'IA_CONFIGURACAO')
     return { url: url.toString(), token }
+}
+const obterConfiguracaoPrivada = () => {
+    const config = obterConfiguracao()
+    if (!['/chat', '/v1/ia/chat'].includes(new URL(config.url).pathname.replace(/\/$/, '')) || !config.token)
+        throw criarErro(503, 'Configure a rota privada e o token compartilhado da IA.', 'IA_CONFIGURACAO')
+    return config
 }
 
 // Cada provedor pode usar um formato diferente para o mesmo pedaço de texto.
@@ -40,16 +47,16 @@ const gerarResposta = async (entrada, aoReceberTrecho = () => {}, signal) => {
     let cancelarLeitura
     let respostaCompleta = ''
     let concluido = false
-    const adicionar = (trecho) => {
+    const adicionar = async (trecho) => {
         sinal.throwIfAborted()
         if (!trecho) return
         if (respostaCompleta.length + trecho.length > 16000)
             throw criarErro(502, 'A resposta da IA excedeu o limite de 16000 caracteres.', 'IA_RESPOSTA_INVALIDA')
         respostaCompleta += trecho
-        aoReceberTrecho(trecho)
+        await aoReceberTrecho(trecho)
     }
     // A IA envia eventos; alguns trazem texto, outros só avisam que terminou.
-    const processarEvento = (evento) => {
+    const processarEvento = async (evento) => {
         const data = evento.split(/\r?\n/).filter((linha) => linha.startsWith('data:'))
             .map((linha) => linha.slice(5).trimStart()).join('\n').trim()
         if (!data) return
@@ -58,8 +65,8 @@ const gerarResposta = async (entrada, aoReceberTrecho = () => {}, signal) => {
         try { dados = JSON.parse(data) }
         catch { throw criarErro(502, 'A IA retornou um evento inválido.', 'IA_RESPOSTA_INVALIDA') }
         if (dados?.tipo === 'erro' || dados?.error)
-            throw criarErro(502, 'A IA não conseguiu concluir a resposta.', 'IA_PROVEDOR')
-        adicionar(extrairTexto(dados))
+            throw erroWorker(502, dados.codigo, dados.retry_after)
+        await adicionar(extrairTexto(dados))
         if (dados?.tipo === 'fim' || dados?.choices?.some((item) => item.finish_reason != null)) concluido = true
     }
     try {
@@ -69,23 +76,34 @@ const gerarResposta = async (entrada, aoReceberTrecho = () => {}, signal) => {
             headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream, application/json',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({ messages: mensagens }),
+            redirect: 'manual',
             signal: sinal
         })
         if (!response.ok) {
-            await response.body?.cancel()
-            if (response.status === 401 || response.status === 403)
-                throw criarErro(503, 'A autenticação com o serviço de IA falhou. Confira o token do backend.', 'IA_AUTENTICACAO')
-            if (response.status === 429)
-                throw criarErro(503, 'O serviço de IA atingiu o limite de uso. Tente novamente mais tarde.', 'IA_LIMITE')
-            throw criarErro(502, 'O serviço de IA está indisponível no momento.', 'IA_PROVEDOR')
+            // Só códigos conhecidos são públicos; nunca repassa mensagem/corpo do provedor.
+            let codigo
+            if (response.headers.get('Content-Type')?.includes('application/json') && response.body) {
+                const leitor = response.body.getReader()
+                try {
+                    let texto = ''
+                    const decoder = new TextDecoder()
+                    while (texto.length <= 16384) {
+                        const parte = await leitor.read()
+                        if (parte.done) break
+                        texto += decoder.decode(parte.value, { stream: true })
+                    }
+                    if (texto.length <= 16384) codigo = JSON.parse(texto).codigo
+                } catch {} finally { await leitor.cancel().catch(() => {}); leitor.releaseLock() }
+            } else await response.body?.cancel()
+            throw erroWorker(response.status, codigo, response.headers.get('Retry-After'))
         }
         if (response.headers.get('Content-Type')?.includes('application/json')) {
             let dados
             try { dados = await response.json() }
             catch { throw criarErro(502, 'A IA retornou um JSON inválido.', 'IA_RESPOSTA_INVALIDA') }
             if (dados?.error || dados?.tipo === 'erro')
-                throw criarErro(502, 'A IA não conseguiu concluir a resposta.', 'IA_PROVEDOR')
-            adicionar(extrairTexto(dados))
+                throw erroWorker(502, dados.codigo, dados.retry_after)
+            await adicionar(extrairTexto(dados))
             concluido = true
         } else {
             if (!response.body || !response.headers.get('Content-Type')?.includes('text/event-stream')) {
@@ -111,11 +129,11 @@ const gerarResposta = async (entrada, aoReceberTrecho = () => {}, signal) => {
                 const eventos = buffer.split(/\r?\n\r?\n/)
                 buffer = eventos.pop() || ''
                 for (const evento of eventos) {
-                    processarEvento(evento)
+                    await processarEvento(evento)
                     if (concluido) break
                 }
                 if (done) {
-                    if (!concluido && buffer.trim()) processarEvento(buffer)
+                    if (!concluido && buffer.trim()) await processarEvento(buffer)
                     break
                 }
             }
@@ -140,4 +158,4 @@ const gerarResposta = async (entrada, aoReceberTrecho = () => {}, signal) => {
     }
 }
 
-module.exports = { gerarResposta, obterConfiguracao, WORKER_URL_PADRAO }
+module.exports = { gerarResposta, obterConfiguracao, obterConfiguracaoPrivada, WORKER_URL_PADRAO }

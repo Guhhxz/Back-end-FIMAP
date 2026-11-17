@@ -18,7 +18,7 @@ const load = (file, mocks = {}) => {
     vm.runInNewContext(fs.readFileSync(absolute, 'utf8'), {
         module, exports: module.exports,
         require: (name) => Object.hasOwn(mocks, name) ? mocks[name] : localRequire(name),
-        console: { error() {}, log() {} }, AbortController, Date, Set, Map
+        console: { error() {}, log() {} }, AbortController, AbortSignal, Date, Set, Map, setTimeout, clearTimeout
     }, { filename: absolute })
     return module.exports
 }

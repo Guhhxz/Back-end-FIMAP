@@ -9,6 +9,7 @@ const autenticar = (req, res, next) => {
     if (tipo !== 'Bearer' || !token) {
         return res.status(config_message.TOKEN_AUSENTE.status).json({
             sucesso: false,
+            codigo: 'TOKEN_AUSENTE',
             mensagem: config_message.TOKEN_AUSENTE.mensagem
         })
     }
@@ -16,6 +17,7 @@ const autenticar = (req, res, next) => {
     if (!process.env.JWT_SECRET) {
         return res.status(config_message.ERRO_LOGIN.status).json({
             sucesso: false,
+            codigo: 'AUTH_CONFIGURACAO',
             mensagem: config_message.ERRO_LOGIN.mensagem
         })
     }
@@ -24,9 +26,12 @@ const autenticar = (req, res, next) => {
         const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] })
 
         // tokens com "tipo" (ex.: de redefinição de senha) não valem como access token
-        if (payload.tipo) {
+        if (typeof payload !== 'object' || payload.tipo ||
+            (typeof payload.sub !== 'number' && (typeof payload.sub !== 'string' || !/^\d+$/.test(payload.sub))) ||
+            !Number.isSafeInteger(Number(payload.sub)) || Number(payload.sub) <= 0) {
             return res.status(config_message.TOKEN_INVALIDO.status).json({
                 sucesso: false,
+                codigo: 'TOKEN_INVALIDO',
                 mensagem: config_message.TOKEN_INVALIDO.mensagem
             })
         }
@@ -40,6 +45,7 @@ const autenticar = (req, res, next) => {
 
         return res.status(erro.status).json({
             sucesso: false,
+            codigo: error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRADO' : 'TOKEN_INVALIDO',
             mensagem: erro.mensagem
         })
     }
