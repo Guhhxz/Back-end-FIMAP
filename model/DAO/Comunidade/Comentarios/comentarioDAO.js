@@ -1,6 +1,6 @@
 const knex = require('knex')
 
-const knexConfig = require('../../Database_config_knex/KnexFile.js')
+const knexConfig = require('../../../Database_config_knex/KnexFile.js')
 const knexConex = knex(knexConfig.development)
 
 // Convenção deste arquivo: erros de banco são relançados (throw);
@@ -55,9 +55,11 @@ const GetComentarioById = async (comentarioId) => {
 // Todos os comentários de um post (raiz + respostas), do mais antigo ao mais novo.
 // Usa o índice IDX_COMENTARIO_POST_DATA
 const GetAllComentariosByIdPost = async (idPost) => {
-    const sql = `select * from tbl_comentario
-        where id_post = ?
-        order by data_criacao asc`
+    const sql = `select c.*,
+    (select count(*) from tbl_comentario t where t.id_comentario_pai = c.id) as total_respostas
+    from tbl_comentario c
+    where c.id_comentario_pai = ?
+    order by c.data_criacao asc`
 
     try {
         const [rows] = await knexConex.raw(sql, [idPost])
@@ -87,9 +89,11 @@ const GetComentariosRaizByIdPost = async (idPost) => {
 
 // Respostas diretas de um comentário
 const GetRespostasByIdComentarioPai = async (idComentarioPai) => {
-    const sql = `select * from tbl_comentario
-        where id_comentario_pai = ?
-        order by data_criacao asc`
+    const sql = `select c.*,
+    (select count(*) from tbl_comentario t where t.id_comentario_pai = c.id) as total_respostas
+    from tbl_comentario c
+    where c.id_post = ? and c.id_comentario_pai is null
+    order by c.data_criacao asc`
 
     try {
         const [rows] = await knexConex.raw(sql, [idComentarioPai])
@@ -113,21 +117,6 @@ const GetAllComentariosByIdUsuario = async (idUsuario) => {
         return rows
     } catch (error) {
         console.error('Erro ao buscar comentários do usuário:', error)
-        throw error
-    }
-}
-
-// Quantidade de comentários de um post (raiz + respostas)
-const CountComentariosByIdPost = async (idPost) => {
-    try {
-        const [rows] = await knexConex.raw(
-            'select count(*) as total from tbl_comentario where id_post = ?',
-            [idPost]
-        )
-
-        return Number(rows[0].total)
-    } catch (error) {
-        console.error('Erro ao contar comentários do post:', error)
         throw error
     }
 }
@@ -182,6 +171,5 @@ module.exports = {
     GetAllComentariosByIdPost,
     GetComentariosRaizByIdPost,
     GetRespostasByIdComentarioPai,
-    GetAllComentariosByIdUsuario,
-    CountComentariosByIdPost
+    GetAllComentariosByIdUsuario
 }

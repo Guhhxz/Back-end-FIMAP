@@ -17,6 +17,7 @@ const chatRoutes = require('./routes/chatRoutes.js')
 const comunidadeRoutes = require('./routes/comunidadeRoutes.js')
 const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
 const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
+
 // const sessaoRoutes = require('./routes/sessaoRoutes.js') // importada mas nunca montada
 
 // Jobs
@@ -51,9 +52,10 @@ app.use('/v1/openfinance/metas', metasRoutes)
 app.use('/v1/seguindo', seguirSeguidoresRoutes)
 app.use('/v1/configuracoes', configuracoesRoutes)
 app.use('/v1/badge', badgeRoutes)
-app.use('/v1', simulacoesRoutes)
+app.use('/v1/simulacao', simulacoesRoutes)
 app.use('/v1/notificacoes', notificacaoRoutes)
 app.use('/v1/comunidade/posts', comunidadeRoutes)
+app.use('/v1/comunidade/posts/comentario', comunidadeRoutes)
 
 /* ----------------------------- Servidor ----------------------------- */
 

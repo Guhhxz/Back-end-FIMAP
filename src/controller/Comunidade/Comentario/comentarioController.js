@@ -1,6 +1,6 @@
-const config_message = require('../modulo/configMensagens.js')
-const comentarioDAO = require('../../../model/DAO/Comentario/ComentarioDAO.js')
-const postDAO = require('../../../model/DAO/Post/PostDAO.js')
+const config_message = require('../../modulo/configMensagens.js')
+const comentarioDAO = require('../../../../model/DAO/Comunidade/Comentarios/comentarioDAO.js')
+const postDAO = require('../../../../model/DAO/Comunidade/Post/postDAO.js')
 
 /* ============================ CONSTANTES ============================ */
 
@@ -73,6 +73,14 @@ const formatarComentario = (c) => ({
     id_comentario_pai: c.id_comentario_pai ?? null
 })
 
+// Igual ao formatarComentario, mas inclui a quantidade de respostas diretas
+// (campo total_respostas, vindo do GetRespostasByIdComentarioPai).
+// Number() porque o driver pode devolver o count(*) como string ou BigInt
+const formatarComentarioComTotal = (c) => ({
+    ...formatarComentario(c),
+    total_respostas: Number(c.total_respostas ?? 0)
+})
+
 // Monta a árvore de comentários a partir da lista plana do banco.
 // Cada comentário ganha "respostas": [] com seus filhos (em qualquer profundidade).
 // A ordem original (data_criacao asc) é preservada em cada nível.
@@ -110,6 +118,9 @@ const buscarPostAtivo = async (idPost) => {
 }
 
 /* ============================ ENDPOINTS ============================ */
+
+// Convenção: os DAOs lançam (throw) em caso de erro de banco, então quem
+// trata é o catch de cada endpoint.
 
 // POST /criar
 // Cria um comentário (raiz ou resposta). Ordem das verificações:
@@ -157,6 +168,7 @@ const criarComentario = async (req, res) => {
             }
         }
 
+        // O DAO devolve o insertId do comentário criado
         const id_comentario = await comentarioDAO.CreateComentario({
             mensagem,
             id_usuario,
@@ -164,7 +176,6 @@ const criarComentario = async (req, res) => {
             id_comentario_pai
         })
 
-        // O DAO devolve false quando o INSERT falha
         if (!id_comentario) {
             return responderErro(res, config_message.ERRO_CRIAR_COMENTARIO)
         }
@@ -211,10 +222,10 @@ const buscarComentarioPorId = async (req, res) => {
     }
 }
 
-// GET /buscar/post/:postId
-// Lista os comentários de um post ATIVO em árvore (raízes com "respostas" aninhadas).
-// Com ?formato=lista devolve a lista plana. Sem comentários, sucesso com lista vazia.
-// "quantidade" é o total (raízes + respostas) nos dois formatos.
+// GET /post/:postId
+// Lista os comentários de um post ativo.
+// Por padrão devolve em árvore (cada comentário com "respostas": []).
+// Com ?formato=lista devolve a lista plana.
 const listarComentariosPorPost = async (req, res) => {
     try {
         const id_post = lerParam(req, 'postId', 'id_post')
@@ -227,12 +238,8 @@ const listarComentariosPorPost = async (req, res) => {
             return responderErro(res, config_message.POST_NAO_ENCONTRADO)
         }
 
+        // [] = post sem comentários (sucesso)
         const comentarios = await comentarioDAO.GetAllComentariosByIdPost(id_post)
-
-        // false = erro de banco ([] = post sem comentários, que é sucesso)
-        if (comentarios === false) {
-            return responderErro(res, config_message.ERRO_BUSCAR_COMENTARIOS)
-        }
 
         const lista = req.query?.formato === 'lista'
             ? comentarios.map(formatarComentario)
@@ -249,9 +256,9 @@ const listarComentariosPorPost = async (req, res) => {
     }
 }
 
-// GET /buscar/respostas/:comentarioId
-// Lista as respostas DIRETAS de um comentário (um nível só).
-// Sem respostas, sucesso com lista vazia.
+// GET /respostas/:comentarioId
+// Lista as respostas diretas de um comentário, cada uma com total_respostas
+// (quantas respostas ela mesma tem). Sem respostas, sucesso com lista vazia.
 const listarRespostas = async (req, res) => {
     try {
         const id_comentario = lerParam(req, 'comentarioId', 'id_comentario')
@@ -266,11 +273,7 @@ const listarRespostas = async (req, res) => {
 
         const respostas = await comentarioDAO.GetRespostasByIdComentarioPai(id_comentario)
 
-        if (respostas === false) {
-            return responderErro(res, config_message.ERRO_BUSCAR_COMENTARIOS)
-        }
-
-        const formatadas = respostas.map(formatarComentario)
+        const formatadas = respostas.map(formatarComentarioComTotal)
 
         return responderSucesso(res, config_message.COMENTARIOS_ENCONTRADOS, {
             quantidade: formatadas.length,
@@ -296,10 +299,6 @@ const listarComentariosPorUsuario = async (req, res) => {
 
         const comentarios = await comentarioDAO.GetAllComentariosByIdUsuario(id_usuario)
 
-        if (comentarios === false) {
-            return responderErro(res, config_message.ERRO_BUSCAR_COMENTARIOS)
-        }
-
         const formatados = comentarios.map(formatarComentario)
 
         return responderSucesso(res, config_message.COMENTARIOS_ENCONTRADOS, {
@@ -309,35 +308,6 @@ const listarComentariosPorUsuario = async (req, res) => {
 
     } catch (error) {
         console.error('Erro ao listar comentários do usuário:', error)
-        return responderErro(res, config_message.ERRO_BUSCAR_COMENTARIOS)
-    }
-}
-
-// GET /contar/post/:postId
-// Quantidade total de comentários de um post ativo (raízes + respostas).
-const contarComentariosPorPost = async (req, res) => {
-    try {
-        const id_post = lerParam(req, 'postId', 'id_post')
-
-        if (!idValido(id_post)) {
-            return responderErro(res, config_message.ID_POST_INVALIDO)
-        }
-
-        if (!await buscarPostAtivo(id_post)) {
-            return responderErro(res, config_message.POST_NAO_ENCONTRADO)
-        }
-
-        const quantidade = await comentarioDAO.CountComentariosByIdPost(id_post)
-
-        // 0 é um resultado válido; só false indica erro
-        if (quantidade === false) {
-            return responderErro(res, config_message.ERRO_BUSCAR_COMENTARIOS)
-        }
-
-        return responderSucesso(res, config_message.COMENTARIOS_ENCONTRADOS, { quantidade })
-
-    } catch (error) {
-        console.error('Erro ao contar comentários:', error)
         return responderErro(res, config_message.ERRO_BUSCAR_COMENTARIOS)
     }
 }
@@ -371,23 +341,19 @@ const atualizarComentario = async (req, res) => {
             return responderErro(res, config_message.COMENTARIO_SEM_PERMISSAO)
         }
 
-        const atualizou = await comentarioDAO.UpdateComentario({
+        // O DAO devolve as linhas afetadas. 0 pode significar que a mensagem é
+        // igual à atual (o MySQL não conta linha sem alteração) ou que o comentário
+        // foi removido no meio do caminho. Por isso a releitura abaixo decide o 404
+        await comentarioDAO.UpdateComentario({
             id: id_comentario,
             id_usuario,
             mensagem
         })
 
-        // false = erro de banco, comentário removido no meio do caminho ou mensagem
-        // igual à atual (o MySQL pode devolver 0 linhas afetadas). Por isso o 404
-        // só vale se o comentário realmente sumiu
-        if (!atualizou && !await comentarioDAO.GetComentarioById(id_comentario)) {
-            return responderErro(res, config_message.COMENTARIO_NAO_ENCONTRADO)
-        }
-
         const atualizado = await comentarioDAO.GetComentarioById(id_comentario)
 
         if (!atualizado) {
-            return responderErro(res, config_message.ERRO_ATUALIZAR_COMENTARIO)
+            return responderErro(res, config_message.COMENTARIO_NAO_ENCONTRADO)
         }
 
         return responderSucesso(res, config_message.COMENTARIO_ATUALIZADO, {
@@ -422,11 +388,12 @@ const deletarComentario = async (req, res) => {
             return responderErro(res, config_message.COMENTARIO_SEM_PERMISSAO)
         }
 
+        // O DAO devolve as linhas afetadas; 0 = o comentário já foi removido
+        // entre a consulta e o delete
         const removeu = await comentarioDAO.DeleteComentario(id_comentario, id_usuario)
 
-        // false = erro de banco ou comentário já removido entre a consulta e o delete
         if (!removeu) {
-            return responderErro(res, config_message.ERRO_DELETAR_COMENTARIO)
+            return responderErro(res, config_message.COMENTARIO_NAO_ENCONTRADO)
         }
 
         return responderSucesso(res, config_message.COMENTARIO_DELETADO)
@@ -443,7 +410,6 @@ module.exports = {
     listarComentariosPorPost,
     listarRespostas,
     listarComentariosPorUsuario,
-    contarComentariosPorPost,
     atualizarComentario,
     deletarComentario
 }

@@ -1,6 +1,6 @@
-const config_message = require('../modulo/configMensagens.js')
+const config_message = require('../../modulo/configMensagens.js')
 const postDAO = require('../../../../model/DAO/Comunidade/Post/postDAO.js')
-const { UploadArquivo, UploadUrl, ExcluirVarias } = require('../../services/cloudinary.js')
+const { UploadArquivo, UploadUrl, ExcluirVarias } = require('../../../services/cloudinary.js')
 
 /* ============================ CONSTANTES ============================ */
 
