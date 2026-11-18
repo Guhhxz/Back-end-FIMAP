@@ -7,18 +7,18 @@ const indicadoresController = require('../controller/Simulacoes/indicadoresContr
 
 // Sem JWT por enquanto: as rotas de simulação recebem o dono em ?id_usuario=
 
-router.get('/simulacoes/indicadores', indicadoresController.consultarIndicadores)
+router.get('/indicadores', indicadoresController.consultarIndicadores)
 
-router.get('/simulacoes/investimentos', simulacaoInvestimentoController.listarSimulacoesInvestimento)
-router.post('/simulacoes/investimentos', simulacaoInvestimentoController.criarSimulacaoInvestimento)
-router.get('/simulacoes/investimentos/:simulacaoId', simulacaoInvestimentoController.consultarSimulacaoInvestimento)
-router.patch('/simulacoes/investimentos/:simulacaoId', simulacaoInvestimentoController.atualizarSimulacaoInvestimento)
-router.delete('/simulacoes/investimentos/:simulacaoId', simulacaoInvestimentoController.removerSimulacaoInvestimento)
+router.get('/investimentos', simulacaoInvestimentoController.listarSimulacoesInvestimento)
+router.post('/investimentos', simulacaoInvestimentoController.criarSimulacaoInvestimento)
+router.get('/investimentos/:simulacaoId', simulacaoInvestimentoController.consultarSimulacaoInvestimento)
+router.patch('/investimentos/:simulacaoId', simulacaoInvestimentoController.atualizarSimulacaoInvestimento)
+router.delete('/investimentos/:simulacaoId', simulacaoInvestimentoController.removerSimulacaoInvestimento)
 
-router.get('/simulacoes/amortizacoes', simulacaoAmortizacaoController.listarSimulacoesAmortizacao)
-router.post('/simulacoes/amortizacoes', simulacaoAmortizacaoController.criarSimulacaoAmortizacao)
-router.get('/simulacoes/amortizacoes/:simulacaoId', simulacaoAmortizacaoController.consultarSimulacaoAmortizacao)
-router.patch('/simulacoes/amortizacoes/:simulacaoId', simulacaoAmortizacaoController.atualizarSimulacaoAmortizacao)
-router.delete('/simulacoes/amortizacoes/:simulacaoId', simulacaoAmortizacaoController.removerSimulacaoAmortizacao)
+router.get('/amortizacoes', simulacaoAmortizacaoController.listarSimulacoesAmortizacao)
+router.post('/amortizacoes', simulacaoAmortizacaoController.criarSimulacaoAmortizacao)
+router.get('/amortizacoes/:simulacaoId', simulacaoAmortizacaoController.consultarSimulacaoAmortizacao)
+router.patch('/amortizacoes/:simulacaoId', simulacaoAmortizacaoController.atualizarSimulacaoAmortizacao)
+router.delete('/amortizacoes/:simulacaoId', simulacaoAmortizacaoController.removerSimulacaoAmortizacao)
 
 module.exports = router
