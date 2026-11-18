@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS tbl_badge_usuario (
 # cria tabela tbl_ranking
 CREATE TABLE IF NOT EXISTS tbl_ranking (
 	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    posicao INT NOT NULL,
+    posicao INT,
     pontos_total INT NOT NULL,
     id_usuario INT NOT NULL,
     
@@ -496,8 +496,198 @@ ALTER TABLE tbl_categoria_meta
     REFERENCES tbl_usuario (id)
     ON DELETE CASCADE;
     
-SELECT * from tbl_conexao_open_finance;
-SELECT * from tbl_meta_financeira;
-    
 ALTER TABLE tbl_conexao_open_finance
 	ADD COLUMN nome_instituicao VARCHAR(100) NULL AFTER external_connection_id;
+
+DELIMITER $$
+
+
+CREATE TRIGGER trg_apos_cadastro_configuracoes
+AFTER INSERT ON tbl_usuario
+FOR EACH ROW
+BEGIN
+    INSERT INTO tbl_configuracoes (id_usuario)
+    VALUES (NEW.id);
+END$$
+
+
+-- Inicializa também o ranking ao cadastrar usuário (complementa trg_apos_cadastro_configuracoes)
+
+CREATE TRIGGER trg_apos_cadastro_ranking
+AFTER INSERT ON tbl_usuario
+FOR EACH ROW
+BEGIN
+    INSERT INTO tbl_ranking ( pontos_total, id_usuario)
+    VALUES (0, NEW.id);
+END$$
+
+-- Ao conquistar badge: soma XP no usuário, recalcula nível, atualiza ranking e gera notificação
+
+CREATE TRIGGER trg_apos_conquista_badge
+AFTER INSERT ON tbl_badge_usuario
+FOR EACH ROW
+BEGIN
+    DECLARE v_xp INT DEFAULT 0;
+    DECLARE v_nome_badge VARCHAR(45);
+    DECLARE v_novo_xp INT DEFAULT 0;
+
+    SELECT xp, nome INTO v_xp, v_nome_badge
+    FROM tbl_badge
+    WHERE id = NEW.id_badge;
+
+	UPDATE tbl_usuario SET xp_usuario = xp_usuario + v_xp WHERE id = NEW.id_usuario;
+	SELECT xp_usuario INTO v_novo_xp FROM tbl_usuario WHERE id = NEW.id_usuario;
+	UPDATE tbl_usuario SET nivel_total = FLOOR(v_novo_xp / 100) + 1 WHERE id = NEW.id_usuario;
+
+    SELECT xp_usuario INTO v_novo_xp
+    FROM tbl_usuario
+    WHERE id = NEW.id_usuario;
+
+    UPDATE tbl_ranking
+    SET pontos_total = v_novo_xp
+    WHERE id_usuario = NEW.id_usuario;
+
+    INSERT INTO tbl_notificacao (icone, nome, conteudo, data_criacao, lida, id_usuario)
+    VALUES ('🏅', 'Nova Conquista!', CONCAT('Você desbloqueou a badge: ', v_nome_badge), NOW(), 0, NEW.id_usuario);
+END$$
+
+-- Invalida códigos OTP anteriores ativos antes de gerar um novo para o usuário
+
+CREATE TRIGGER trg_antes_inserir_otp
+BEFORE INSERT ON tbl_codigo_otp
+FOR EACH ROW
+BEGIN
+    UPDATE tbl_codigo_otp
+    SET ativo = 0
+    WHERE id_usuario = NEW.id_usuario AND ativo = 1;
+END$$
+
+-- Conclui a meta automaticamente quando valor_total atinge valor_desejado
+
+CREATE TRIGGER trg_antes_atualizar_meta
+BEFORE UPDATE ON tbl_meta_financeira
+FOR EACH ROW
+BEGIN
+    IF NEW.valor_total >= NEW.valor_desejado AND OLD.status = 1 THEN
+        SET NEW.status = 2; -- 2 = Concluída
+        INSERT INTO tbl_notificacao (icone, nome, conteudo, data_criacao, lida, id_usuario)
+        VALUES ('🎉', 'Meta Atingida!', CONCAT('Parabéns! Você concluiu a meta: ', NEW.nome), NOW(), 0, NEW.id_usuario);
+    END IF;
+END$$
+
+-- Notifica o autor do post quando recebe uma curtida (se não for auto-curtida)
+
+CREATE TRIGGER trg_apos_curtida_post
+AFTER INSERT ON tbl_curtida_post
+FOR EACH ROW
+BEGIN
+    DECLARE v_autor_post INT;
+    DECLARE v_nome_curtidor VARCHAR(80);
+
+    SELECT id_usuario INTO v_autor_post FROM tbl_post WHERE id = NEW.id_post;
+    SELECT COALESCE(nome_exibicao, nome) INTO v_nome_curtidor FROM tbl_usuario WHERE id = NEW.id_usuario;
+
+    IF v_autor_post <> NEW.id_usuario THEN
+        INSERT INTO tbl_notificacao (icone, nome, conteudo, data_criacao, lida, id_usuario)
+        VALUES ('❤️', 'Nova curtida', CONCAT(v_nome_curtidor, ' curtiu sua publicação.'), NOW(), 0, v_autor_post);
+    END IF;
+END$$
+
+-- Auto-moderação: oculta o post (status = 0) se atingir 5 denúncias
+
+CREATE TRIGGER trg_apos_denuncia_post
+AFTER INSERT ON tbl_denuncia
+FOR EACH ROW
+BEGIN
+    DECLARE v_total_denuncias INT DEFAULT 0;
+
+    SELECT COUNT(*) INTO v_total_denuncias
+    FROM tbl_denuncia
+    WHERE id_post = NEW.id_post;
+
+    IF v_total_denuncias >= 5 THEN
+        UPDATE tbl_post
+        SET status = 0, data_atualizacao = NOW()
+        WHERE id = NEW.id_post;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- Feed da Comunidade
+CREATE OR REPLACE VIEW vw_feed_comunidade AS
+SELECT
+    p.id AS id_post,
+    p.conteudo,
+    p.data_criacao,
+    p.data_atualizacao,
+    u.id AS id_autor,
+    COALESCE(u.nome_exibicao, u.nome) AS autor_nome,
+    u.username_social,
+    u.foto_perfil,
+    u.nivel_total,
+    (SELECT COUNT(*) FROM tbl_curtida_post cp WHERE cp.id_post = p.id) AS total_curtidas,
+    (SELECT COUNT(*) FROM tbl_comentario c WHERE c.id_post = p.id) AS total_comentarios
+FROM tbl_post p
+INNER JOIN tbl_usuario u ON u.id = p.id_usuario
+WHERE p.status = 1 AND u.visibilidade = 1
+ORDER BY p.data_criacao DESC;
+
+-- Perfil Completo do Usuário
+CREATE OR REPLACE VIEW vw_perfil_usuario AS
+SELECT
+    u.id,
+    u.nome,
+    u.email,
+    u.username,
+    u.nome_exibicao,
+    u.username_social,
+    u.biografia_social,
+    u.localizacao_estado,
+    u.foto_perfil,
+    u.visibilidade,
+    u.xp_usuario,
+    u.nivel_total,
+    COALESCE(r.posicao, 0) AS ranking_posicao,
+    (SELECT COUNT(*) FROM tbl_seguidores s WHERE s.id_seguindo = u.id) AS total_seguidores,
+    (SELECT COUNT(*) FROM tbl_seguidores s WHERE s.id_seguidor = u.id) AS total_seguindo,
+    (SELECT COUNT(*) FROM tbl_badge_usuario bu WHERE bu.id_usuario = u.id) AS total_badges
+FROM tbl_usuario u
+LEFT JOIN tbl_ranking r ON r.id_usuario = u.id;
+
+-- Metas Financeiras com Progresso e Instituição
+CREATE OR REPLACE VIEW vw_metas_detalhadas AS
+SELECT
+    m.id,
+    m.nome,
+    m.descricao,
+    m.valor_inicio,
+    m.valor_desejado,
+    m.valor_total,
+    m.aporte_mensal,
+    ROUND((m.valor_total / NULLIF(m.valor_desejado, 0)) * 100, 2) AS percentual_concluido,
+    GREATEST(DATEDIFF(m.data_alvo, NOW()), 0) AS dias_restantes,
+    m.data_alvo,
+    m.status,
+    m.id_usuario,
+    cm.nome AS categoria_nome,
+    cof.nome_instituicao AS instituicao_vinculada
+FROM tbl_meta_financeira m
+INNER JOIN tbl_categoria_meta cm ON cm.id = m.id_categoria
+LEFT JOIN tbl_conexao_open_finance cof ON cof.id = m.id_conta_vinculada;
+
+-- 4. Ranking Público
+CREATE OR REPLACE VIEW vw_ranking_geral AS
+SELECT
+    r.posicao,
+    r.pontos_total,
+    u.id AS id_usuario,
+    COALESCE(u.nome_exibicao, u.nome) AS nome_exibicao,
+    u.username_social,
+    u.foto_perfil,
+    u.nivel_total
+FROM tbl_ranking r
+INNER JOIN tbl_usuario u ON u.id = r.id_usuario
+WHERE u.visibilidade = 1
+ORDER BY r.posicao ASC;
+
