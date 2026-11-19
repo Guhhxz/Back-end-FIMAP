@@ -2165,7 +2165,97 @@ const config_message = {
         sucesso: false,
         mensagem: 'O Ollama está indisponível. Verifique se está em execução.'
     },
-    ERROR_INTERNAL_SERVER: { sucesso: false, mensagem: 'Erro interno do servidor.' }
+    ERROR_INTERNAL_SERVER: { sucesso: false, mensagem: 'Erro interno do servidor.' },
+
+// ==========================================
+// DENÚNCIAS
+// ==========================================
+
+DENUNCIA_CRIADA: {
+    status: 201,
+    mensagem: 'Denúncia registrada com sucesso.'
+},
+DENUNCIA_ENCONTRADA: {
+    status: 200,
+    mensagem: 'Denúncia encontrada com sucesso.'
+},
+DENUNCIAS_ENCONTRADAS: {
+    status: 200,
+    mensagem: 'Denúncias encontradas com sucesso.'
+},
+DENUNCIA_ATUALIZADA: {
+    status: 200,
+    mensagem: 'Denúncia atualizada com sucesso.'
+},
+DENUNCIA_DELETADA: {
+    status: 200,
+    mensagem: 'Denúncia removida com sucesso.'
+},
+
+ID_DENUNCIA_INVALIDO: {
+    status: 400,
+    mensagem: 'ID da denúncia inválido.'
+},
+ID_CATEGORIA_DENUNCIA_INVALIDO: {
+    status: 400,
+    mensagem: 'ID da categoria da denúncia inválido.'
+},
+DENUNCIA_DADOS_INVALIDOS: {
+    status: 400,
+    mensagem: 'Título (até 100 caracteres) e descrição são obrigatórios.'
+},
+DENUNCIA_PROPRIO_POST: {
+    status: 400,
+    mensagem: 'Você não pode denunciar o seu próprio post.'
+},
+
+DENUNCIA_SEM_PERMISSAO: {
+    status: 403,
+    mensagem: 'Você não tem permissão para acessar esta denúncia.'
+},
+DENUNCIA_NAO_ENCONTRADA: {
+    status: 404,
+    mensagem: 'Denúncia não encontrada.'
+},
+DENUNCIA_JA_EXISTE: {
+    status: 409,
+    mensagem: 'Você já denunciou este post.'
+},
+
+ERRO_CRIAR_DENUNCIA: {
+    status: 500,
+    mensagem: 'Erro ao registrar a denúncia.'
+},
+ERRO_BUSCAR_DENUNCIAS: {
+    status: 500,
+    mensagem: 'Erro ao buscar as denúncias.'
+},
+ERRO_ATUALIZAR_DENUNCIA: {
+    status: 500,
+    mensagem: 'Erro ao atualizar a denúncia.'
+},
+ERRO_DELETAR_DENUNCIA: {
+    status: 500,
+    mensagem: 'Erro ao remover a denúncia.'
+},
+
+CATEGORIAS_DENUNCIA_ENCONTRADAS: {
+    status: 200,
+    mensagem: 'Categorias de denúncia encontradas com sucesso.'
+},
+
+DENUNCIA_CATEGORIA_NAO_ENCONTRADA: {
+    status: 404,
+    mensagem: 'Nenhuma categoria de denúncia encontrada.'
+},
+
+ERRO_BUSCAR_CATEGORIAS_DENUNCIA: {
+    status: 500,
+    mensagem: 'Erro ao buscar as categorias de denúncia.'
+},
+
 }
 
 module.exports = config_message
+
+

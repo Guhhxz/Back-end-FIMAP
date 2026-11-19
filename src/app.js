@@ -14,7 +14,13 @@ const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
 const chatRoutes = require('./routes/chatRoutes.js')
-const comunidadeRoutes = require('./routes/comunidadeRoutes.js')
+const postRoutes = require('./routes/postRoutes.js')
+const comentarRoutes = require('./routes/comentarioRoutes.js')
+const denunciarRoutes = require('./routes/denunciaRoutes.js')
+const curtirRoutes = require('./routes/curtidaRoutes.js')
+
+
+
 const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
 const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
 
@@ -59,9 +65,10 @@ app.use('/v1/configuracoes', configuracoesRoutes)
 app.use('/v1/badge', badgeRoutes)
 app.use('/v1/simulacoes', simulacoesRoutes)
 app.use('/v1/notificacoes', notificacaoRoutes)
-app.use('/v1/comunidade/posts', comunidadeRoutes)
-app.use('/v1/comunidade/posts/comentario', comunidadeRoutes)
-app.use('/v1/comunidade/curtida', comunidadeRoutes)
+app.use('/v1/comunidade/posts', postRoutes)
+app.use('/v1/comunidade/posts/comentario', comentarRoutes)
+app.use('/v1/comunidade/curtida', curtirRoutes)
+app.use('/v1/comunidade/denuncia', denunciarRoutes)
 
 /* ----------------------------- Servidor ----------------------------- */
 
@@ -72,7 +79,6 @@ const servidor = app.listen(PORT, (erro) => {
     }
 
     console.log(`Servidor rodando na porta ${PORT}`)
-    investimentoSnapshotJob.agendar()
 })
 
 servidor.on('error', (erro) => {

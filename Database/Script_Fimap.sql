@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS tbl_badge_usuario (
 # cria tabela tbl_ranking
 CREATE TABLE IF NOT EXISTS tbl_ranking (
 	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    posicao INT,
+    posicao INT NOT NULL,
     pontos_total INT NOT NULL,
     id_usuario INT NOT NULL,
     
@@ -446,6 +446,20 @@ CREATE TABLE IF NOT EXISTS tbl_categoria_denuncia (
     nome VARCHAR(40) NOT NULL
 );
 
+
+INSERT INTO tbl_categoria_denuncia (nome) VALUES
+('Spam'),
+('Discurso de ódio'),
+('Assédio ou bullying'),
+('Conteúdo ofensivo'),
+('Informação falsa'),
+('Golpe ou fraude'),
+('Conteúdo impróprio'),
+('Violação de privacidade'),
+('Falsidade ideológica'),
+('Conteúdo fora do contexto'),
+('Divulgação não autorizada');
+
 # ------------------- DENUNCIA --------------------
 # cria tabela tbl_denuncia
 CREATE TABLE IF NOT EXISTS tbl_denuncia (
@@ -485,22 +499,24 @@ ALTER TABLE tbl_meta_financeira
     FOREIGN KEY (id_conta_vinculada)
     REFERENCES tbl_conexao_open_finance (id)
     ON DELETE SET NULL;
-
+    
 ALTER TABLE tbl_categoria_meta
     ADD COLUMN id_usuario INT NULL AFTER nome;
-
+    
 
 ALTER TABLE tbl_categoria_meta
     ADD CONSTRAINT FK_USUARIO_CATEGORIAMETA
     FOREIGN KEY (id_usuario)
     REFERENCES tbl_usuario (id)
     ON DELETE CASCADE;
-
+    
+SELECT * from tbl_conexao_open_finance;
+SELECT * from tbl_meta_financeira;
+    
 ALTER TABLE tbl_conexao_open_finance
 	ADD COLUMN nome_instituicao VARCHAR(100) NULL AFTER external_connection_id;
 
 DELIMITER $$
-
 
 CREATE TRIGGER trg_apos_cadastro_configuracoes
 AFTER INSERT ON tbl_usuario
@@ -512,17 +528,15 @@ END$$
 
 
 -- Inicializa também o ranking ao cadastrar usuário (complementa trg_apos_cadastro_configuracoes)
-
 CREATE TRIGGER trg_apos_cadastro_ranking
 AFTER INSERT ON tbl_usuario
 FOR EACH ROW
 BEGIN
-    INSERT INTO tbl_ranking ( pontos_total, id_usuario)
-    VALUES (0, NEW.id);
+    INSERT INTO tbl_ranking (posicao, pontos_total, id_usuario)
+    VALUES (0, 0, NEW.id);
 END$$
 
 -- Ao conquistar badge: soma XP no usuário, recalcula nível, atualiza ranking e gera notificação
-
 CREATE TRIGGER trg_apos_conquista_badge
 AFTER INSERT ON tbl_badge_usuario
 FOR EACH ROW
@@ -535,9 +549,10 @@ BEGIN
     FROM tbl_badge
     WHERE id = NEW.id_badge;
 
-	UPDATE tbl_usuario SET xp_usuario = xp_usuario + v_xp WHERE id = NEW.id_usuario;
-	SELECT xp_usuario INTO v_novo_xp FROM tbl_usuario WHERE id = NEW.id_usuario;
-	UPDATE tbl_usuario SET nivel_total = FLOOR(v_novo_xp / 100) + 1 WHERE id = NEW.id_usuario;
+    UPDATE tbl_usuario
+    SET xp_usuario = xp_usuario + v_xp,
+        nivel_total = FLOOR((xp_usuario + v_xp) / 100) + 1
+    WHERE id = NEW.id_usuario;
 
     SELECT xp_usuario INTO v_novo_xp
     FROM tbl_usuario
@@ -552,7 +567,6 @@ BEGIN
 END$$
 
 -- Invalida códigos OTP anteriores ativos antes de gerar um novo para o usuário
-
 CREATE TRIGGER trg_antes_inserir_otp
 BEFORE INSERT ON tbl_codigo_otp
 FOR EACH ROW
@@ -563,7 +577,6 @@ BEGIN
 END$$
 
 -- Conclui a meta automaticamente quando valor_total atinge valor_desejado
-
 CREATE TRIGGER trg_antes_atualizar_meta
 BEFORE UPDATE ON tbl_meta_financeira
 FOR EACH ROW
@@ -576,7 +589,6 @@ BEGIN
 END$$
 
 -- Notifica o autor do post quando recebe uma curtida (se não for auto-curtida)
-
 CREATE TRIGGER trg_apos_curtida_post
 AFTER INSERT ON tbl_curtida_post
 FOR EACH ROW
@@ -594,7 +606,6 @@ BEGIN
 END$$
 
 -- Auto-moderação: oculta o post (status = 0) se atingir 5 denúncias
-
 CREATE TRIGGER trg_apos_denuncia_post
 AFTER INSERT ON tbl_denuncia
 FOR EACH ROW
