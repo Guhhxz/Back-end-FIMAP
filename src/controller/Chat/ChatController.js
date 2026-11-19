@@ -7,47 +7,50 @@ const idChat = (req) => {
     if (!id) throw criarErro(400, 'ID do chat inválido.', 'CHAT_ID_INVALIDO')
     return id
 }
+const idUsuario = (req) => {
+    const id = validarId(req.params.id_usuario)
+    if (!id) throw criarErro(400, 'ID do usuário inválido.', 'USUARIO_ID_INVALIDO')
+    return id
+}
 const nomeChat = (req) => {
     const nome = typeof req.body?.nome === 'string' ? req.body.nome.trim() : ''
     if (!nome || nome.length > 45) throw criarErro(400, 'O nome deve ter entre 1 e 45 caracteres.', 'CHAT_NOME_INVALIDO')
     return nome
 }
 const naoEncontrado = () => criarErro(404, 'Chat não encontrado.', 'CHAT_NAO_ENCONTRADO')
+
 const CriarChat = async (req, res) => {
     try {
         const nome = nomeChat(req)
-        const id = await dao.insertChat(nome, req.usuario.id)
+        const id = await dao.insertChat(nome, idUsuario(req))
         return res.status(201).json({ sucesso: true, mensagem: 'Chat criado com sucesso.', id, nome })
     } catch (error) { return responderErro(res, error) }
 }
 const ListarChatsPorUsuario = async (req, res) => {
     try {
-        // Compatibilidade com URL antiga, sem permitir que o parâmetro escolha o usuário.
-        if (req.params.id_usuario !== undefined && validarId(req.params.id_usuario) !== req.usuario.id)
-            throw naoEncontrado()
-        const conteudo = await dao.ListChatsByUserId(req.usuario.id)
+        const conteudo = await dao.ListChatsByUserId(idUsuario(req))
         return res.json({ sucesso: true, mensagem: 'Chats consultados com sucesso.', quantidade: conteudo.length, conteudo })
     } catch (error) { return responderErro(res, error) }
 }
 const ListaPorId = async (req, res) => {
     try {
-        const conteudo = await dao.GetChatById(idChat(req), req.usuario.id)
+        const conteudo = await dao.GetChatById(idChat(req), idUsuario(req))
         if (!conteudo) throw naoEncontrado()
         return res.json({ sucesso: true, mensagem: 'Chat consultado com sucesso.', conteudo })
     } catch (error) { return responderErro(res, error) }
 }
 const AtualizarNomeChat = async (req, res) => {
     try {
-        const id = idChat(req), nome = nomeChat(req)
-        const atual = await dao.GetChatById(id, req.usuario.id)
+        const id = idChat(req), nome = nomeChat(req), usuario = idUsuario(req)
+        const atual = await dao.GetChatById(id, usuario)
         if (!atual) throw naoEncontrado()
-        if (atual.nome !== nome && !await dao.UpdateChatName(id, nome, req.usuario.id)) throw naoEncontrado()
+        if (atual.nome !== nome && !await dao.UpdateChatName(id, nome, usuario)) throw naoEncontrado()
         return res.json({ sucesso: true, mensagem: 'Chat atualizado com sucesso.' })
     } catch (error) { return responderErro(res, error) }
 }
 const ApagarChat = async (req, res) => {
     try {
-        if (!await dao.apagarChat(idChat(req), req.usuario.id)) throw naoEncontrado()
+        if (!await dao.apagarChat(idChat(req), idUsuario(req))) throw naoEncontrado()
         return res.json({ sucesso: true, mensagem: 'Chat apagado com sucesso.' })
     } catch (error) { return responderErro(res, error) }
 }

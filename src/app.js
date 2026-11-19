@@ -1,4 +1,4 @@
-// Variáveis de ambiente
+﻿// Variáveis de ambiente
 require('dotenv').config({
     path: require('path').resolve(__dirname, '../.env')
 })
@@ -77,7 +77,6 @@ const servidor = app.listen(PORT, (erro) => {
         console.error('Erro ao subir o servidor:', erro)
         process.exit(1)
     }
-
     console.log(`Servidor rodando na porta ${PORT}`)
 })
 
