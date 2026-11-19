@@ -23,8 +23,8 @@ const mensagemChatRoutes = require('./routes/mensagemChatRoutes.js')
 const chatPublicoController = require('./controller/MensagemChat/PublicChatController.js')
 const limitarChat = require('./middlewares/limitarChat.js')
 
-// Jobs
-const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
+
+const PORT = process.env.PORT || 8080
 
 const corsOptions = {
     origin: '*',
@@ -63,32 +63,19 @@ app.use('/v1/comunidade/posts', comunidadeRoutes)
 app.use('/v1/comunidade/posts/comentario', comunidadeRoutes)
 app.use('/v1/comunidade/curtida', comunidadeRoutes)
 
-app.use('/v1/sessao', sessaoRoutes)
+/* ----------------------------- Servidor ----------------------------- */
 
-app.use((error, req, res, next) => {
-    if (res.headersSent) return next(error)
-    const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : 500
-    const mensagem = status === 413 ? 'O corpo da requisição excedeu o limite permitido.'
-        : status === 400 ? 'O corpo precisa ser um JSON válido.' : 'Erro interno do servidor.'
-    return res.status(status).json({ sucesso: false, codigo: status === 500 ? 'ERRO_INTERNO' : 'REQUISICAO_INVALIDA', mensagem })
+const servidor = app.listen(PORT, (erro) => {
+    if (erro) {
+        console.error('Erro ao subir o servidor:', erro)
+        process.exit(1)
+    }
+
+    console.log(`Servidor rodando na porta ${PORT}`)
+    investimentoSnapshotJob.agendar()
 })
 
-if (require.main === module) {
-    const PORT = process.env.PORT || 8080
-    const servidor = app.listen(PORT, () => {
-        console.log(`Servidor rodando na porta ${PORT}`)
-        investimentoSnapshotJob.agendar()
-    })
-    servidor.on("error", (error) => {
-        if (error.code === 'EADDRINUSE') {
-            console.error(`Não foi possível iniciar: a porta ${PORT} já está em uso. Encerre a execução anterior ou configure outra PORT.`)
-        } else if (error.code === 'EACCES') {
-            console.error(`Não foi possível iniciar: sem permissão para usar a porta ${PORT}.`)
-        } else {
-            console.error('Não foi possível iniciar o servidor. Código:', error.code || 'ERRO_INTERNO')
-        }
-        process.exit(1)
-    })
-}
-
-module.exports = app
+servidor.on('error', (erro) => {
+    console.error('Erro no servidor:', erro)
+    process.exit(1)
+})

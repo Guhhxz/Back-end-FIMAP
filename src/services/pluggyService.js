@@ -3,7 +3,6 @@ const pluggy = require("../config/pluggy")
 const conexaoDAO = require("../../model/DAO/OpenFinance/conexaoOpenFinanceDAO.js")
 const MS_DIA = 24 * 60 * 60 * 1000
 const MAXIMO_CATEGORIAS_PADRAO = 4
-const investimentoSnapshotDAO = require("../../model/DAO/OpenFinance/investimentoSnapshotDAO.js")
 const numeroOuNull = (...valores) => {
     for (const valor of valores) {
         if (valor === undefined || valor === null || valor === "") {
@@ -442,11 +441,6 @@ const listarInvestimentos = async (itemId) => {
     )
 
     const valorTotal = investimentos.reduce((soma, i) => soma + (i.valor || 0), 0)
-    try {
-        await investimentoSnapshotDAO.registrarSnapshot(itemId, valorTotal)
-    } catch (error) {
-        console.error("Erro ao registrar snapshot de investimentos:", error)
-    }
 
     return {
         atualizando: false,
@@ -461,8 +455,6 @@ const listarEvolucaoInvestimentos = async (itemId, periodo) => {
     if (!PERIODOS_VALIDOS.includes(periodo)) {
         throw erroHttp(400, "Período inválido. Use 1m, 6m, 1a ou tudo.")
     }
-
-    const linhas = await investimentoSnapshotDAO.listarPorPeriodo(itemId, periodo)
 
     return {
         evolucao: linhas.map((l) => ({
