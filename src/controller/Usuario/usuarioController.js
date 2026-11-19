@@ -142,19 +142,6 @@ const criarCodigoOTPUsuario = async (req, res) => {
             return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
         }
 
-        const configuracoesCriadas = await configuracoesModel.InsertConfiguracoes(id_usuario, {
-            notificacao: 0,
-            alerta: 0,
-            relatorio: 0,
-            recomendacao: 0,
-            topicos: 0
-        })
-
-        if (!configuracoesCriadas) {
-            await desfazerCadastro(id_usuario)
-            return responderErro(res, config_message.ERRO_CRIAR_USUARIO)
-        }
-
         // 3. cria o código ligado ao usuário
         const codigo = gerarCodigo()
 

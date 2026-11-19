@@ -63,6 +63,7 @@ const listarSimulacoesInvestimento = executar(async (req, res, usuarioId) => {
         return erro(res, 422, 'Parâmetros de paginação inválidos.')
     }
     const simulacoes = await dao.listarSimulacoesInvestimento(usuarioId, { pagina, tamanho })
+    console.log(simulacoes)
     return res.status(200).json(simulacoes)
 })
 

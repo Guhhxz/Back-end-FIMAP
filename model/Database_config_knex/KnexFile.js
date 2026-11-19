@@ -5,9 +5,9 @@ module.exports = {
       // ALTERAÇÃO: Define o cliente como 'mysql2'
       client: 'mysql2',
       connection: {
-        host: process.env.DB_HOST || 'localhost', 
-        user: process.env.DB_USER || 'root', 
-        password: process.env.DB_PASSWORD, 
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME || 'db_fimap_2026',
         port: Number(process.env.DB_PORT || 3306), // Porta padrão do MySQL
        

@@ -19,12 +19,12 @@ router.patch("/alterar/senha-atual/:id_usuario", usuarioController.alterarSenhaC
 
 
 // Buscar usuários
-router.get("/usuario/:username", usuarioController.buscarUsuarioPorUsername)
-router.get("/usuario/id/:id_usuario", usuarioController.buscarUsuarioPorId)
-router.get("/usuario/email/:email", usuarioController.buscarUsuarioPorEmail)
-router.get("/usuarios", usuarioController.buscarTodosUsuarios)
+router.get("/username/:username", usuarioController.buscarUsuarioPorUsername)
+router.get("/id/:id_usuario", usuarioController.buscarUsuarioPorId)
+router.get("/email/:email", usuarioController.buscarUsuarioPorEmail)
+router.get("/listar", usuarioController.buscarTodosUsuarios)
 router.get("/otp/codigos", usuarioController.buscarTodosCodigos)
-router.get("todos/dispositivos", dispositivoController.buscarTodosDispositivos)
+router.get("/todos/dispositivos", dispositivoController.buscarTodosDispositivos)
 // Deletar usuário
 router.delete("/usuario-delete/:id_usuario", usuarioController.deletarUsuario)
 

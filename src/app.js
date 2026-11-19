@@ -1,67 +1,69 @@
-/*
- * PARA QUE SERVE: Monta e inicia o backend: configura o Express e conecta as rotas.
- * QUANDO ENTRA EM AÇÃO: Entra no npm start; nos testes pode ser importado sem abrir o servidor automaticamente.
- * QUANDO FAZ DIFERENÇA: Faz diferença para receber pedidos HTTP e iniciar o agendamento normal do backend.
- */
-
-// Importando as dependências
-require("dotenv").config({
-    path: require("path").resolve(__dirname, "../.env")
+// Variáveis de ambiente
+require('dotenv').config({
+    path: require('path').resolve(__dirname, '../.env')
 })
 
-const express = require("express")
-const cors = require("cors")
+const express = require('express')
+const cors = require('cors')
 
-// Importando rotas e controllers
-const openFinanceRoutes = require('../src/routes/openFinanceRoutes.js')
+// Rotas
+const openFinanceRoutes = require('./routes/openFinanceRoutes.js')
 const usuarioRoutes = require('./routes/usuarioRoutes.js')
 const simulacoesRoutes = require('./routes/simulacoesRoutes.js')
 const metasRoutes = require('./routes/metasRoutes.js')
 const configuracoesRoutes = require('./routes/configuracoesRoutes.js')
 const badgeRoutes = require('./routes/badgeRoutes.js')
-const chatRoutes = require("./routes/chatRoutes.js")
-const mensagemChatRoutes = require("./routes/mensagemChatRoutes.js")
-const chatPublicoController = require("./controller/MensagemChat/PublicChatController.js")
-const limitarChat = require("./middlewares/limitarChat.js")
-const seguir_seguidoresRoutes = require("./routes/seguir_seguidoresRoutes.js")
-const notificacaoRoutes = require("./routes/notificacaoRoutes.js")
-const postRoutes = require("./routes/postRoutes.js")
-const sessaoRoutes = require('./routes/sessaoRoutes.js')
+const chatRoutes = require('./routes/chatRoutes.js')
+const comunidadeRoutes = require('./routes/comunidadeRoutes.js')
+const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
+const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
 
-//exportanto jobs
+const sessaoRoutes = require('./routes/sessaoRoutes.js')
+const mensagemChatRoutes = require('./routes/mensagemChatRoutes.js')
+const chatPublicoController = require('./controller/MensagemChat/PublicChatController.js')
+const limitarChat = require('./middlewares/limitarChat.js')
+
+// Jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
+
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Retry-After', 'X-Requisicao-Id']
+}
 
 const app = express()
 
-const corsOption = {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["Retry-After", "X-Requisicao-Id"]
-}
+/* ---------------------------- Middlewares ---------------------------- */
 
-app.use(cors(corsOption))
-app.use(express.json({ limit: "192kb" }))
+app.use(cors(corsOptions))
+app.use(express.json({ limit: '192kb' }))
 app.use(express.urlencoded({ extended: true }))
 
-app.get('/ping', (req, res) => {
-    return res.status(200).json({ status: 'API funcionando no Render!'});
-  });
+/* ------------------------------- Rotas ------------------------------- */
 
-app.get("/health", (req, res) => res.status(200).json({ online: true, servico: "fimap-api" }))
-app.post("/v1/ia/chat-publico", limitarChat, chatPublicoController.conversarPublicamente)
-app.use("/v1/ia/chats", mensagemChatRoutes)
-app.use("/v1/ia/chat/", chatRoutes)
-app.use("/v1/openfinance", openFinanceRoutes)
-app.use("/v1/openfinance/usuario", usuarioRoutes)
-app.use("/v1/seguindo", seguir_seguidoresRoutes)
-app.use("/v1/configuracoes", configuracoesRoutes)
-app.use("/v1/openfinance/metas", metasRoutes)
-app.use("/v1/badge", badgeRoutes)
-app.use("/v1", simulacoesRoutes)
-app.use("/v1/notificacoes", notificacaoRoutes)
-app.use("/v1/comunidade/posts", postRoutes)
-app.use("/v1/sessao", sessaoRoutes)
+app.get('/ping', (req, res) => {
+    return res.status(200).json({ status: 'API funcionando no Render!' })
+})
+
+app.get('/health', (req, res) => res.status(200).json({ online: true, servico: 'fimap-api' }))
+app.post('/v1/ia/chat-publico', limitarChat, chatPublicoController.conversarPublicamente)
+app.use('/v1/ia/chats', mensagemChatRoutes)
+app.use('/v1/ia/chat', chatRoutes)
+app.use('/v1/openfinance', openFinanceRoutes)
+app.use('/v1/openfinance/usuario', usuarioRoutes)
+app.use('/v1/openfinance/metas', metasRoutes)
+app.use('/v1/seguindo', seguirSeguidoresRoutes)
+app.use('/v1/configuracoes', configuracoesRoutes)
+app.use('/v1/badge', badgeRoutes)
+app.use('/v1/simulacoes', simulacoesRoutes)
+app.use('/v1/notificacoes', notificacaoRoutes)
+app.use('/v1/comunidade/posts', comunidadeRoutes)
+app.use('/v1/comunidade/posts/comentario', comunidadeRoutes)
+app.use('/v1/comunidade/curtida', comunidadeRoutes)
+
+app.use('/v1/sessao', sessaoRoutes)
 
 app.use((error, req, res, next) => {
     if (res.headersSent) return next(error)

@@ -1,11 +1,11 @@
 const jwt = require('jsonwebtoken');
 
+const expiresIn = process.env.JWT_EXPIRATION || '1h';
+
 // Função para gerar um token JWT
 const gerarToken = (payload) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) return null;
-
-    const expiresIn = process.env.JWT_EXPIRATION || '1h';
     return jwt.sign(payload, secret, { algorithm: 'HS256', expiresIn });
 };
 
@@ -13,7 +13,6 @@ const gerarToken = (payload) => {
 const validarToken = (token) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) return null;
-
     try {
         return jwt.verify(token, secret, { algorithms: ['HS256'] });
     } catch (error) {
