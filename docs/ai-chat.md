@@ -14,6 +14,7 @@ Na API de mensagens, a conversão é explícita: 0 = usuário e 1 = IA.
 Copie os nomes de configuração de `.env.example` para o ambiente privado:
 
 - `JWT_SECRET`: assinatura do JWT de acesso do aplicativo, algoritmo HS256, usuário no `sub`.
+- `JWT_EXPIRATION`: duração do JWT de acesso, com padrão de 1 hora (`1h`).
 - `CLOUDFLARE_WORKER_URL`: URL completa privada, recomendada `https://ia-fimap.fimap-agency.workers.dev/v1/ia/chat`.
 - `CLOUDFLARE_CHAT_TOKEN`: mesmo valor de `CHAT_API_TOKEN` do Worker; não é o JWT do usuário.
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`: acesso ao MySQL.
@@ -41,6 +42,12 @@ Após exclusão, recuperação retorna 404 e a retenção de idempotência daque
 
 Base: `/v1/ia/chat`. Todos exigem `Authorization: Bearer JWT_DO_USUARIO`.
 JWT ausente, inválido, expirado ou de redefinição de senha não autoriza operações.
+
+Após validar as credenciais e concluir o registro do dispositivo,
+`POST /v1/openfinance/usuario/login` retorna HTTP 200 com
+`sucesso`, `mensagem`, `usuario` (sem a senha) e `access_token`.
+Mantenha o `access_token` em memória e envie-o no cabeçalho
+`Authorization: Bearer <access_token>` nas requisições protegidas.
 `id_usuario` em corpo/query não define o dono. A URL antiga `/listar-chats/:id_usuario`
 só é aceita se corresponder ao usuário autenticado. A listagem geral foi substituída pela listagem do próprio usuário.
 Chats alheios e inexistentes produzem o mesmo 404. Nenhuma listagem nem cadastro cria chats de demonstração.

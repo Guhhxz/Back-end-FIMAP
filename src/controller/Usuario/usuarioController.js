@@ -5,6 +5,7 @@ const dispositivoModel = require('../../../model/DAO/Dispositivos/dispositivos.j
 const usuarioModel = require('../../../model/DAO/Usuario/usuarioDAO.js')
 const configuracoesModel = require('../../../model/DAO/Configuracoes/configuracoes.js')
 const { enviarOTP } = require('../../config/email.js')
+const { gerarToken } = require('../../services/jwtService.js')
 
 const OTP_VALIDADE_MS = 5 * 60 * 1000
 const SENHA_MIN_CARACTERES = 8
@@ -641,10 +642,20 @@ const login = async (req, res) => {
             })
         }
 
+        const accessToken = gerarToken({ sub: String(idDoUsuario(usuario)) })
+        if (!accessToken) {
+            return res.status(config_message.ERRO_LOGIN.status).json({
+                sucesso: false,
+                codigo: 'AUTH_CONFIGURACAO',
+                mensagem: config_message.ERRO_LOGIN.mensagem
+            })
+        }
+
         return res.status(config_message.LOGIN_SUCESSO.status).json({
             sucesso: true,
             mensagem: config_message.LOGIN_SUCESSO.mensagem,
-            usuario: semSenha(usuario)
+            usuario: semSenha(usuario),
+            access_token: accessToken
         })
     } catch (error) {
         console.error('Erro ao realizar login:', error)

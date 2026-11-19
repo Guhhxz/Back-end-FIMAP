@@ -77,8 +77,14 @@ if (require.main === module) {
         console.log(`Servidor rodando na porta ${PORT}`)
         investimentoSnapshotJob.agendar()
     })
-    servidor.on("error", () => {
-        console.error("Não foi possível iniciar o servidor.")
+    servidor.on("error", (error) => {
+        if (error.code === 'EADDRINUSE') {
+            console.error(`Não foi possível iniciar: a porta ${PORT} já está em uso. Encerre a execução anterior ou configure outra PORT.`)
+        } else if (error.code === 'EACCES') {
+            console.error(`Não foi possível iniciar: sem permissão para usar a porta ${PORT}.`)
+        } else {
+            console.error('Não foi possível iniciar o servidor. Código:', error.code || 'ERRO_INTERNO')
+        }
         process.exit(1)
     })
 }
