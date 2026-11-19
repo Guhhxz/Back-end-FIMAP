@@ -22,8 +22,13 @@
     "wrangler": "^4.151.3"
   },
   "scripts": {
-    "start": "node app.js",
+    "start": "node src/app.js",
     "deploy": "wrangler deploy",
-    "preview": "wrangler dev"
+    "preview": "wrangler dev",
+    "test": "node --test tests/*.test.js",
+    "db:migrate": "knex --knexfile model/Database_config_knex/KnexFile.js migrate:latest"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

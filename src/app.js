@@ -1,4 +1,4 @@
-﻿// Variáveis de ambiente
+// Variáveis de ambiente
 require('dotenv').config({
     path: require('path').resolve(__dirname, '../.env')
 })
@@ -18,17 +18,19 @@ const comunidadeRoutes = require('./routes/comunidadeRoutes.js')
 const seguirSeguidoresRoutes = require('./routes/seguir_seguidoresRoutes.js')
 const notificacaoRoutes = require('./routes/notificacaoRoutes.js')
 
-// const sessaoRoutes = require('./routes/sessaoRoutes.js') // importada mas nunca montada
+const sessaoRoutes = require('./routes/sessaoRoutes.js')
+const mensagemChatRoutes = require('./routes/mensagemChatRoutes.js')
+const chatPublicoController = require('./controller/MensagemChat/PublicChatController.js')
+const limitarChat = require('./middlewares/limitarChat.js')
 
 // Jobs
 const investimentoSnapshotJob = require('./jobs/investimentoSnapshotJob.js')
 
-const PORT = process.env.PORT || 8080
-
 const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Retry-After', 'X-Requisicao-Id']
 }
 
 const app = express()
@@ -45,6 +47,9 @@ app.get('/ping', (req, res) => {
     return res.status(200).json({ status: 'API funcionando no Render!' })
 })
 
+app.get('/health', (req, res) => res.status(200).json({ online: true, servico: 'fimap-api' }))
+app.post('/v1/ia/chat-publico', limitarChat, chatPublicoController.conversarPublicamente)
+app.use('/v1/ia/chats', mensagemChatRoutes)
 app.use('/v1/ia/chat', chatRoutes)
 app.use('/v1/openfinance', openFinanceRoutes)
 app.use('/v1/openfinance/usuario', usuarioRoutes)
@@ -58,19 +63,32 @@ app.use('/v1/comunidade/posts', comunidadeRoutes)
 app.use('/v1/comunidade/posts/comentario', comunidadeRoutes)
 app.use('/v1/comunidade/curtida', comunidadeRoutes)
 
-/* ----------------------------- Servidor ----------------------------- */
+app.use('/v1/sessao', sessaoRoutes)
 
-const servidor = app.listen(PORT, (erro) => {
-    if (erro) {
-        console.error('Erro ao subir o servidor:', erro)
+app.use((error, req, res, next) => {
+    if (res.headersSent) return next(error)
+    const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : 500
+    const mensagem = status === 413 ? 'O corpo da requisição excedeu o limite permitido.'
+        : status === 400 ? 'O corpo precisa ser um JSON válido.' : 'Erro interno do servidor.'
+    return res.status(status).json({ sucesso: false, codigo: status === 500 ? 'ERRO_INTERNO' : 'REQUISICAO_INVALIDA', mensagem })
+})
+
+if (require.main === module) {
+    const PORT = process.env.PORT || 8080
+    const servidor = app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}`)
+        investimentoSnapshotJob.agendar()
+    })
+    servidor.on("error", (error) => {
+        if (error.code === 'EADDRINUSE') {
+            console.error(`Não foi possível iniciar: a porta ${PORT} já está em uso. Encerre a execução anterior ou configure outra PORT.`)
+        } else if (error.code === 'EACCES') {
+            console.error(`Não foi possível iniciar: sem permissão para usar a porta ${PORT}.`)
+        } else {
+            console.error('Não foi possível iniciar o servidor. Código:', error.code || 'ERRO_INTERNO')
+        }
         process.exit(1)
-    }
+    })
+}
 
-    console.log(`Servidor rodando na porta ${PORT}`)
-    investimentoSnapshotJob.agendar()
-})
-
-servidor.on('error', (erro) => {
-    console.error('Erro no servidor:', erro)
-    process.exit(1)
-})
+module.exports = app

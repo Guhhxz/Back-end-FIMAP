@@ -485,17 +485,17 @@ ALTER TABLE tbl_meta_financeira
     FOREIGN KEY (id_conta_vinculada)
     REFERENCES tbl_conexao_open_finance (id)
     ON DELETE SET NULL;
-    
+
 ALTER TABLE tbl_categoria_meta
     ADD COLUMN id_usuario INT NULL AFTER nome;
-    
+
 
 ALTER TABLE tbl_categoria_meta
     ADD CONSTRAINT FK_USUARIO_CATEGORIAMETA
     FOREIGN KEY (id_usuario)
     REFERENCES tbl_usuario (id)
     ON DELETE CASCADE;
-    
+
 ALTER TABLE tbl_conexao_open_finance
 	ADD COLUMN nome_instituicao VARCHAR(100) NULL AFTER external_connection_id;
 
@@ -690,4 +690,3 @@ FROM tbl_ranking r
 INNER JOIN tbl_usuario u ON u.id = r.id_usuario
 WHERE u.visibilidade = 1
 ORDER BY r.posicao ASC;
-

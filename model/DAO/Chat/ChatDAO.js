@@ -1,85 +1,46 @@
-const knex = require('knex')
-const knexConfig = require('../../Database_config_knex/KnexFile.js')
+/*
+ * PARA QUE SERVE: Lê e altera os dados do chat no banco: nome, dono, criação e exclusão.
+ * QUANDO ENTRA EM AÇÃO: Entra quando o ChatController precisa criar, listar, renomear ou apagar um chat.
+ * QUANDO FAZ DIFERENÇA: Faz diferença para manter os IDs corretos e executar as consultas com parâmetros.
+ */
 
-const knexConex = knex(knexConfig.development)
+const db = require('../../Database_config_knex/connection.js')
 
-const inssertChat = async (nome, id_usuario) => {
-    const sql = 'insert into tbl_chat (nome, data_criacao, id_usuario) values (?, now(), ?);'
-
-    try {
-        const [result] = await knexConex.raw(sql, [nome, id_usuario])
-        return result.insertId
-    } catch (error) {
-        console.error("Erro ao inserir chat:", error)
-        throw error
-    }
+const insertChat = async (nome, id_usuario) => {
+    const [result] = await db.raw(
+        'insert into tbl_chat (nome, data_criacao, id_usuario) values (?, now(), ?);', [nome, id_usuario])
+    return result.insertId
 }
 
-const GetChatById = async (id_chat) => {
-    const sql = 'select id, nome, data_criacao, id_usuario from tbl_chat where id = ?;'
-
-    try {
-        const [rows] = await knexConex.raw(sql, [id_chat])
-        return rows[0] || null
-    } catch (error) {
-        console.error("Erro ao buscar chat:", error)
-        throw error
-    }
+// O id também é retornado para os controllers conseguirem referenciar o chat.
+const GetChatById = async (id_chat, id_usuario) => {
+    const [rows] = await db.raw('select id, nome, data_criacao, id_usuario from tbl_chat where id = ? and id_usuario = ?;', [id_chat, id_usuario])
+    return rows[0] || null
 }
 
 const ListChatsByUserId = async (id_usuario) => {
-    const sql = 'select nome, data_criacao from tbl_chat where id_usuario = ? order by data_criacao desc;'
-
-    try {
-        const [rows] = await knexConex.raw(sql, [id_usuario])
-        return rows
-    } catch (error) {
-        console.error("Erro ao listar chats:", error)
-        throw error
-    }
+    const [rows] = await db.raw(
+        'select id, nome, data_criacao, id_usuario from tbl_chat where id_usuario = ? order by data_criacao desc, id desc;',
+        [id_usuario])
+    return rows
 }
 
-
-const apagarChat = async (id_chat) => {
-    const sql = 'delete from tbl_chat where id = ?;'
-
-    try {
-        await knexConex.raw(sql, [id_chat])
-    } catch (error) {
-        console.error("Erro ao apagar chat:", error)
-        throw error
-    }
+// A exclusão exige que chat e usuário correspondam no próprio comando SQL.
+const apagarChat = async (id_chat, id_usuario) => {
+    const [result] = await db.raw('delete from tbl_chat where id = ? and id_usuario = ?;', [id_chat, id_usuario])
+    return result.affectedRows > 0
 }
 
-const UpdateChatName = async (id_chat, novo_nome) => {
-    const sql = 'update tbl_chat set nome = ? where id = ?;'
-
-    try {
-        await knexConex.raw(sql, [novo_nome, id_chat])
-    } catch (error) {
-        console.error("Erro ao atualizar nome do chat:", error)
-        throw error
-    }
+const UpdateChatName = async (id_chat, novo_nome, id_usuario) => {
+    const [result] = await db.raw('update tbl_chat set nome = ? where id = ? and id_usuario = ?;', [novo_nome, id_chat, id_usuario])
+    return result.affectedRows > 0
 }
-
-const GetAllChats = async () => {
-    const sql = 'select id, nome, data_criacao, id_usuario from tbl_chat;'
-
-    try {
-        const [rows] = await knexConex.raw(sql)
-        return rows
-    } catch (error) {
-        console.error("Erro ao buscar todos os chats:", error)
-        throw error
-    }
-} 
-
 
 module.exports = {
-    inssertChat,
+    insertChat,
+    inssertChat: insertChat, // Compatibilidade com chamadas existentes.
     GetChatById,
-    apagarChat,
     ListChatsByUserId,
-    UpdateChatName,
-    GetAllChats
+    apagarChat,
+    UpdateChatName
 }
